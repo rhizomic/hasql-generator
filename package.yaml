@@ -1,0 +1,147 @@
+name: hasql-generator
+version: 0.0.1.0
+
+default-extensions:
+- BlockArguments
+- DataKinds
+- DefaultSignatures
+- DeriveFunctor
+- DeriveGeneric
+- DerivingStrategies
+- DuplicateRecordFields
+- FlexibleContexts
+- FlexibleInstances
+- GADTs
+- GeneralizedNewtypeDeriving
+- ImportQualifiedPost
+- InstanceSigs
+- LambdaCase
+- MultiParamTypeClasses
+- MultiWayIf
+- NamedFieldPuns
+- NegativeLiterals
+- NoImplicitPrelude
+- NoFieldSelectors # use OverloadedRecordDot syntax instead
+- NumericUnderscores
+- OverloadedRecordDot
+- OverloadedStrings
+- PartialTypeSignatures
+- PatternSynonyms
+- RankNTypes
+- ScopedTypeVariables
+- StandaloneDeriving
+- TypeApplications
+- TypeFamilies
+- TypeOperators
+- UndecidableInstances
+
+extra-source-files:
+  - README.md
+  - CHANGELOG.md
+
+ghc-options:
+  - -Weverything
+
+  - -Wno-missing-kind-signatures # Don't require kind signatures
+
+  - -Wno-unsafe # Don't use Safe Haskell warnings
+  - -Wno-safe # Don't use Safe Haskell warnings
+  - -Wno-missing-safe-haskell-mode # Don't use Safe Haskell warnings
+  - -Wno-missed-specialisations # This happens when GHC can't specialize a polymorphic function; it's not a big deal.
+  - -Wno-all-missed-specialisations # This happens when GHC can't specialize a polymorphic function; it's not a big deal.
+  - -Wno-unused-packages # This is fine for now, we can always remove packages later.
+  - -Wno-unticked-promoted-constructors # Richard Eisenberg (the author of -Wunticked-promoted-constructors) says it's a misfeature: https://mail.haskell.org/pipermail/haskell-cafe/2021-October/134748.html
+
+dependencies:
+  # Fast JSON parsing and encoding
+  - aeson
+
+  # Haskell's base library, containing core types, data structures, and the
+  # Prelude
+  - base
+
+  # Byte strings
+  - bytestring
+
+  # Assorted concrete container types
+  - containers
+
+  # Extras for the "contravariant" package
+  - contravariant-extras
+
+  # Platform-agnostic library for filesystem operations
+  - directory
+
+  # Extensible optionally-pure exceptions
+  - exceptions
+
+  # A library of extra functions for the standard Haskell libraries
+  - extra
+
+  # Library for manipulating FilePaths in a cross platform way
+  - filepath
+
+  # PostgreSQL driver
+  - hasql >= 1.8
+
+  # Enables the use of PostgreSQL connection pools
+  #
+  # For background reading, see:
+  # https://stackoverflow.blog/2020/10/14/improve-database-performance-with-connection-pooling/
+  - hasql-pool >= 1.2.0.2
+
+  # Composable abstraction over retryable transactions for Hasql
+  - hasql-transaction
+
+  # PostgreSQL AST parsing and rendering
+  - postgresql-syntax
+
+  # A regex library on top of pcre-light
+  - pcre-heavy
+
+  # Portable temporary file and directory support
+  - temporary
+
+  # An efficient packed Unicode text type
+  - text
+
+  # Run external processes/commands
+  - typed-process
+
+  # The MonadUnliftIO typeclass for unlifting monads to IO
+  - unliftio-core
+
+  # Efficient Arrays
+  - vector
+
+# hpack defaults this to Haskell2010 if not specified.
+language: GHC2021
+
+library:
+  source-dirs: src
+  when:
+  - condition: false
+    other-modules: Paths_hasql-generator
+
+tests:
+  hasql-generator-test:
+    main: Main.hs
+    source-dirs: test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - hasql-generator
+
+    # Testing framework
+    - hspec
+
+    # Contributed functionality for Hspec
+    - hspec-contrib
+
+    # Sanely formatted and colorized diffs
+    - hspec-expectations-pretty-diff
+
+    # Golden tests for hspec
+    - hspec-golden

@@ -1,0 +1,43 @@
+module SelectIdLine1AndLine2FromAddresses
+  (query)
+where
+
+import Control.Applicative ((<*>))
+import Data.Bool (Bool (True))
+import Data.ByteString (ByteString)
+import Data.Function (($))
+import Data.Functor ((<$>))
+import Data.Maybe (Maybe)
+import Data.Text (Text)
+import Data.UUID (UUID)
+import Data.Vector (Vector)
+import Hasql.Decoders qualified as Decoders
+import Hasql.Encoders qualified as Encoders
+import Hasql.Statement (Statement (Statement))
+import Hasql.Transaction (Transaction, statement)
+
+query ::
+  Transaction (Vector (UUID, Text, Maybe Text))
+query =
+  statement
+   params
+   (Statement sql encoder decoder True)
+
+  where
+    sql :: ByteString
+    sql = "select id, line_1, line_2 from addresses;"
+
+    params :: ()
+    params = ()
+
+    encoder :: Encoders.Params ()
+    encoder =
+      Encoders.noParams
+
+    decoder :: Decoders.Result (Vector (UUID, Text, Maybe Text))
+    decoder =
+      Decoders.rowVector $
+        (,,)
+          <$> Decoders.column (Decoders.nonNullable Decoders.uuid)
+          <*> Decoders.column (Decoders.nonNullable Decoders.text)
+          <*> Decoders.column (Decoders.nullable Decoders.text)

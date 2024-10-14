@@ -1,0 +1,162 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.36.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           hasql-generator
+version:        0.0.1.0
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+library
+  exposed-modules:
+      Hasql.Generator
+      Hasql.Generator.Internal.Database
+      Hasql.Generator.Internal.Database.Sql
+      Hasql.Generator.Internal.Database.Sql.Analysis
+      Hasql.Generator.Internal.Database.Sql.Parser
+      Hasql.Generator.Internal.Database.Sql.Parser.Types
+      Hasql.Generator.Internal.Database.Sql.PreparedStatement
+      Hasql.Generator.Internal.Database.Sql.Types
+      Hasql.Generator.Internal.Database.Statement
+      Hasql.Generator.Internal.Database.Transaction
+      Hasql.Generator.Internal.Database.Types
+      Hasql.Generator.Internal.Renderer
+      Hasql.Generator.Internal.Renderer.Types
+      Hasql.Generator.Types
+  other-modules:
+      Paths_hasql_generator
+  hs-source-dirs:
+      src
+  default-extensions:
+      BlockArguments
+      DataKinds
+      DefaultSignatures
+      DeriveFunctor
+      DeriveGeneric
+      DerivingStrategies
+      DuplicateRecordFields
+      FlexibleContexts
+      FlexibleInstances
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      NegativeLiterals
+      NoImplicitPrelude
+      NoFieldSelectors
+      NumericUnderscores
+      OverloadedRecordDot
+      OverloadedStrings
+      PartialTypeSignatures
+      PatternSynonyms
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TypeApplications
+      TypeFamilies
+      TypeOperators
+      UndecidableInstances
+  ghc-options: -Weverything -Wno-missing-kind-signatures -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-missed-specialisations -Wno-all-missed-specialisations -Wno-unused-packages -Wno-unticked-promoted-constructors
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , containers
+    , contravariant-extras
+    , directory
+    , exceptions
+    , extra
+    , filepath
+    , hasql >=1.8
+    , hasql-pool >=1.2.0.2
+    , hasql-transaction
+    , pcre-heavy
+    , postgresql-syntax
+    , temporary
+    , text
+    , typed-process
+    , unliftio-core
+    , vector
+  default-language: GHC2021
+
+test-suite hasql-generator-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Hasql.Generator.Internal.Database.Sql.ParserSpec
+      Hasql.Generator.Internal.DatabaseSpec
+      Hasql.Generator.Internal.RendererSpec
+      Hasql.GeneratorSpec
+      TestImport.Assertions
+      TestImport.Migrations
+      Paths_hasql_generator
+  hs-source-dirs:
+      test
+  default-extensions:
+      BlockArguments
+      DataKinds
+      DefaultSignatures
+      DeriveFunctor
+      DeriveGeneric
+      DerivingStrategies
+      DuplicateRecordFields
+      FlexibleContexts
+      FlexibleInstances
+      GADTs
+      GeneralizedNewtypeDeriving
+      ImportQualifiedPost
+      InstanceSigs
+      LambdaCase
+      MultiParamTypeClasses
+      MultiWayIf
+      NamedFieldPuns
+      NegativeLiterals
+      NoImplicitPrelude
+      NoFieldSelectors
+      NumericUnderscores
+      OverloadedRecordDot
+      OverloadedStrings
+      PartialTypeSignatures
+      PatternSynonyms
+      RankNTypes
+      ScopedTypeVariables
+      StandaloneDeriving
+      TypeApplications
+      TypeFamilies
+      TypeOperators
+      UndecidableInstances
+  ghc-options: -Weverything -Wno-missing-kind-signatures -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-missed-specialisations -Wno-all-missed-specialisations -Wno-unused-packages -Wno-unticked-promoted-constructors -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , containers
+    , contravariant-extras
+    , directory
+    , exceptions
+    , extra
+    , filepath
+    , hasql >=1.8
+    , hasql-generator
+    , hasql-pool >=1.2.0.2
+    , hasql-transaction
+    , hspec
+    , hspec-contrib
+    , hspec-expectations-pretty-diff
+    , hspec-golden
+    , pcre-heavy
+    , postgresql-syntax
+    , temporary
+    , text
+    , typed-process
+    , unliftio-core
+    , vector
+  default-language: GHC2021

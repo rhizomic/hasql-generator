@@ -1,0 +1,1 @@
+select country from addresses;

@@ -1,0 +1,18 @@
+---
+repos:
+  - repo: local
+    hooks:
+      - id: hlint
+        name: HLint
+        entry: hlint
+        language: system
+        types:
+          - haskell
+
+      - id: fourmolu
+        name: Format Haskell code with Fourmolu
+        entry: fourmolu --mode=inplace
+        language: system
+        types:
+          - haskell
+        require_serial: true

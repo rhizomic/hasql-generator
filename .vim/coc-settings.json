@@ -1,0 +1,15 @@
+{
+  "languageserver": {
+    "haskell": {
+      "command": "haskell-language-server-wrapper",
+      "args": ["--lsp"],
+      "rootPatterns": ["*.cabal", "stack.yaml", "cabal.project", "package.yaml", "hie.yaml"],
+      "filetypes": ["haskell", "hs"]
+     }
+  },
+  "codeLens.enable": true,
+  "diagnostic.checkCurrentLine": true,
+  "diagnostic.enable": true,
+  "coc.preferences.autoTrigger": "none",
+  "suggest.autoTrigger": "none"
+}

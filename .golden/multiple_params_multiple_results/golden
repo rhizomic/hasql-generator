@@ -1,0 +1,50 @@
+module SelectIdLine1AndLine2FromAddressesByCityPostalCodeOrCountry
+  (query)
+where
+
+import Contravariant.Extras (contrazip3)
+import Control.Applicative ((<*>))
+import Data.Bool (Bool (True))
+import Data.ByteString (ByteString)
+import Data.Function (($))
+import Data.Functor ((<$>))
+import Data.Maybe (Maybe)
+import Data.Text (Text)
+import Data.UUID (UUID)
+import Data.Vector (Vector)
+import Hasql.Decoders qualified as Decoders
+import Hasql.Encoders qualified as Encoders
+import Hasql.Statement (Statement (Statement))
+import Hasql.Transaction (Transaction, statement)
+
+query ::
+  Text ->
+  Text ->
+  Text ->
+  Transaction (Vector (UUID, Text, Maybe Text))
+query a1 a2 a3 =
+  statement
+   params
+   (Statement sql encoder decoder True)
+
+  where
+    sql :: ByteString
+    sql = "select id, line_1, line_2 from addresses where city = $1 or postal_code = $2 or country = $3;"
+
+    params :: (Text, Text, Text)
+    params = (a1, a2, a3)
+
+    encoder :: Encoders.Params (Text, Text, Text)
+    encoder =
+      contrazip3
+        (Encoders.param $ Encoders.nonNullable Encoders.text)
+        (Encoders.param $ Encoders.nonNullable Encoders.text)
+        (Encoders.param $ Encoders.nonNullable Encoders.text)
+
+    decoder :: Decoders.Result (Vector (UUID, Text, Maybe Text))
+    decoder =
+      Decoders.rowVector $
+        (,,)
+          <$> Decoders.column (Decoders.nonNullable Decoders.uuid)
+          <*> Decoders.column (Decoders.nonNullable Decoders.text)
+          <*> Decoders.column (Decoders.nullable Decoders.text)

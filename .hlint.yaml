@@ -1,0 +1,22 @@
+- ignore: {name: "Use if"} # Case can be nicer in some instances, especially because you can flip the order (False/True).
+- ignore: {name: "Use ||"} # Using or [a, b, c] can be nicer than a || b || c, especially when a, b, and c are long expressions.
+- ignore: {name: "Use &&"} # Using and [a, b, c] can be nicer than a && b && c, especially when a, b, and c are long expressions.
+- ignore: {name: "Use <$>"} # Using 'fmap' can be nicer in some instances.
+- ignore: {name: "Use unless"} # Double negatives can be unwieldy.
+
+- modules:
+  - {name: Prelude, within: [], message: "Don't use Prelude. Import things from their respective libraries instead."} # Ban the use of Prelude
+
+- functions:
+  - {name: Test.Hspec.shouldBe, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldBe instead"}
+  - {name: Test.Hspec.shouldSatisfy, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldSatisfy instead"}
+  - {name: Test.Hspec.shouldStartWith, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldStartWith instead"}
+  - {name: Test.Hspec.shouldEndWith, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldEndWith instead"}
+  - {name: Test.Hspec.shouldContain, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldContain instead"}
+  - {name: Test.Hspec.shouldMatchList, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldMatchList instead"}
+  - {name: Test.Hspec.shouldReturn, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldReturn instead"}
+  - {name: Test.Hspec.shouldNotBe, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldNotBe instead"}
+  - {name: Test.Hspec.shouldNotSatisfy, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldNotSatisfy instead"}
+  - {name: Test.Hspec.shouldNotContain, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldNotContain instead"}
+  - {name: Test.Hspec.shouldNotReturn, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldNotReturn instead"}
+  - {name: Test.Hspec.shouldThrow, within: [], message: "Use Test.Hspec.Expectations.Pretty.shouldThrow instead"}

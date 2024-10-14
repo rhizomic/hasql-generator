@@ -1,0 +1,10 @@
+cradle:
+  multi:
+    - path: "src"
+      config: {cradle: {cabal: {component: "lib:hasql-generator"}}}
+
+    - path: "bin"
+      config: {cradle: {cabal: {component: "hasql-generator:hasql-generator"}}}
+
+    - path: "test"
+      config: {cradle: {cabal: {component: "hasql-generator:hasql-generator-test"}}}

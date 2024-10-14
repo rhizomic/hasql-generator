@@ -1,0 +1,40 @@
+module GetLine1Address
+  (query)
+where
+
+import Control.Applicative ((<*>))
+import Data.Bool (Bool (True))
+import Data.ByteString (ByteString)
+import Data.Function (($))
+import Data.Functor ((<$>))
+import Data.Maybe (Maybe)
+import Data.Text (Text)
+import Data.UUID (UUID)
+import Hasql.Decoders qualified as Decoders
+import Hasql.Encoders qualified as Encoders
+import Hasql.Statement (Statement (Statement))
+import Hasql.Transaction (Transaction, statement)
+
+query ::
+  UUID ->
+  Transaction (Maybe Text)
+query a1 =
+  statement
+   params
+   (Statement sql encoder decoder True)
+
+  where
+    sql :: ByteString
+    sql = "select line_1 from addresses a where a.user_id = $1;"
+
+    params :: UUID
+    params = a1
+
+    encoder :: Encoders.Params UUID
+    encoder =
+      Encoders.param $ Encoders.nonNullable Encoders.uuid
+
+    decoder :: Decoders.Result (Maybe Text)
+    decoder =
+      Decoders.rowMaybe $
+        Decoders.column (Decoders.nonNullable Decoders.text)

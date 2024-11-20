@@ -81,6 +81,7 @@ library
     , hasql-pool >=1.2.0.2
     , hasql-transaction
     , pcre-heavy
+    , pg-query
     , postgresql-syntax
     , temporary
     , text
@@ -155,6 +156,7 @@ test-suite hasql-generator-test
     , hspec-expectations-pretty-diff
     , hspec-golden
     , pcre-heavy
+    , pg-query
     , postgresql-syntax
     , temporary
     , text

@@ -65,6 +65,8 @@ library
       TypeOperators
       UndecidableInstances
   ghc-options: -Weverything -Wno-missing-kind-signatures -Wno-unsafe -Wno-safe -Wno-missing-safe-haskell-mode -Wno-missed-specialisations -Wno-all-missed-specialisations -Wno-unused-packages -Wno-unticked-promoted-constructors
+  extra-libraries:
+      pg_query
   build-depends:
       aeson
     , base
@@ -79,6 +81,7 @@ library
     , hasql-pool >=1.2.0.2
     , hasql-transaction
     , pcre-heavy
+    , pg-query
     , postgresql-syntax
     , temporary
     , text
@@ -153,6 +156,7 @@ test-suite hasql-generator-test
     , hspec-expectations-pretty-diff
     , hspec-golden
     , pcre-heavy
+    , pg-query
     , postgresql-syntax
     , temporary
     , text

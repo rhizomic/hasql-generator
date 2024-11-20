@@ -93,6 +93,9 @@ dependencies:
   # Composable abstraction over retryable transactions for Hasql
   - hasql-transaction
 
+  # Parse PostgreSQL DDL and DML: Haskell bindings for libpg_query
+  - pg-query
+
   # PostgreSQL AST parsing and rendering
   - postgresql-syntax
 
@@ -122,6 +125,8 @@ library:
   when:
   - condition: false
     other-modules: Paths_hasql-generator
+  extra-libraries:
+  - pg_query
 
 tests:
   hasql-generator-test:

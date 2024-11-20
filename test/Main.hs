@@ -9,6 +9,7 @@ import Hasql.Generator.Internal.DatabaseSpec qualified as DatabaseSpec
 import Hasql.Generator.Internal.RendererSpec qualified as RendererSpec
 import Hasql.GeneratorSpec qualified as GeneratorSpec
 import Hasql.Pool (Pool, use)
+import PgQuery hiding (String, action, view)
 import System.IO (IO)
 import Test.Hspec (describe, hspec)
 import Test.Hspec.Expectations.Pretty (shouldNotBe)

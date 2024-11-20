@@ -36,6 +36,22 @@
         "type": "github"
       }
     },
+    "hs_pg-query": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1732100805,
+        "narHash": "sha256-Yb3hHgiRRLBrmocZwacrbUC3dmHQ6H57xnaAbktIQD0=",
+        "ref": "refs/heads/master",
+        "rev": "74fe6fd1f4e2c6a80234e431e08283486a50e8bd",
+        "revCount": 5,
+        "type": "git",
+        "url": "https://git.sr.ht/~rhizomic/pg-query"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://git.sr.ht/~rhizomic/pg-query"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1724446125,
@@ -87,6 +103,7 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
+        "hs_pg-query": "hs_pg-query",
         "nixpkgs": "nixpkgs",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "tmp-postgres": "tmp-postgres"

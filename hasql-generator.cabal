@@ -80,6 +80,7 @@ library
     , hasql >=1.8
     , hasql-pool >=1.2.0.2
     , hasql-transaction
+    , lens
     , pcre-heavy
     , pg-query
     , postgresql-syntax
@@ -155,6 +156,7 @@ test-suite hasql-generator-test
     , hspec-contrib
     , hspec-expectations-pretty-diff
     , hspec-golden
+    , lens
     , pcre-heavy
     , pg-query
     , postgresql-syntax

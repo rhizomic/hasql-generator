@@ -6,9 +6,14 @@ module Hasql.Generator.Internal.Database.Sql.ParserSpec (spec) where
 import Data.Function (($))
 import Data.List.NonEmpty (fromList)
 import Data.Maybe (Maybe (Just, Nothing))
-import Hasql.Generator.Internal.Database.Sql.Parser (parseJoins, parseLimit)
+import Hasql.Generator.Internal.Database.Sql.Parser
+  ( parseJoins,
+    parseLimit,
+    parseParameters,
+  )
 import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( JoinInformation (JoinInformation, joinType, tableAndAlias),
+    Parameter (Parameter, parameterNumber, parameterReference),
     PostgresqlJoinType (CrossJoin, FullJoin, InnerJoin, LeftJoin),
     TableAndAlias (TableAndAlias, alias, table),
     TableRelation (BaseTable, JoinTable),
@@ -317,3 +322,77 @@ spec = do
           expected = Just 1
 
       actual `shouldBe` expected
+
+  -- TODO: CTEs
+  describe "parseParameters" do
+    it "Parses no parameters from a query that lacks parameters" $ do
+      let query = "select u.name from users"
+          expected = []
+      actual <- parseParameters query
+      actual `shouldBe` expected
+
+    describe "When given a select statement" $ do
+      it "Parses the parameters from a where clause containing basic expressions" $ do
+        let query = "select u.name from users u where u.id = $1 or u.created_at > $2"
+            expected =
+              [ Parameter
+                  { parameterNumber = 1
+                  , parameterReference = "u.id"
+                  }
+              , Parameter
+                  { parameterNumber = 2
+                  , parameterReference = "u.created_at"
+                  }
+              ]
+        actual <- parseParameters query
+        actual `shouldBe` expected
+
+      it "Parses the parameters from a where clause containing an 'in'" $ do
+        let query = "select u.name from users u where u.id in ($1, $2)"
+            expected =
+              [ Parameter
+                  { parameterNumber = 1
+                  , parameterReference = "u.id"
+                  }
+              , Parameter
+                  { parameterNumber = 2
+                  , parameterReference = "u.id"
+                  }
+              ]
+        actual <- parseParameters query
+        actual `shouldBe` expected
+
+      it "Parses the parameters from join clauses and where clauses" $ do
+        let query = "select u.name, a.line_1 from users u left join addresses a on u.id = a.user_id and a.city = $1 where u.id = $2 or a.line_2 = $3"
+            expected =
+              [ Parameter
+                  { parameterNumber = 1
+                  , parameterReference = "a.city"
+                  }
+              , Parameter
+                  { parameterNumber = 2
+                  , parameterReference = "u.id"
+                  }
+              , Parameter
+                  { parameterNumber = 3
+                  , parameterReference = "a.line_2"
+                  }
+              ]
+        actual <- parseParameters query
+        actual `shouldBe` expected
+
+    describe "When given an update statement" $ do
+      it "Parses the parameters from a where clause containing basic expressions" $ do
+        let query = "update users set name = $1 where id = $2"
+            expected =
+              [ Parameter
+                  { parameterNumber = 1
+                  , parameterReference = "name"
+                  }
+              , Parameter
+                  { parameterNumber = 2
+                  , parameterReference = "id"
+                  }
+              ]
+        actual <- parseParameters query
+        actual `shouldBe` expected

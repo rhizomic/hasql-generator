@@ -2,28 +2,71 @@ module Hasql.Generator.Internal.Database.Sql.Parser
   ( parseAsExpression,
     parseJoins,
     parseLimit,
+    parseParameters,
   )
 where
 
+import Control.Applicative (pure)
+import Control.Lens (preview, toListOf, traverse, view)
 import Control.Monad ((=<<))
 import Data.Either (Either (Left, Right))
 import Data.Eq ((==))
-import Data.Foldable (foldMap)
+import Data.Foldable (concatMap, foldMap)
 import Data.Function (($), (.))
+import Data.Functor (fmap)
 import Data.Int (Int)
 import Data.List ((++))
 import Data.List.NonEmpty (head, nonEmpty)
 import Data.List.NonEmpty.Extra (NonEmpty)
-import Data.Maybe (Maybe (Just, Nothing), maybe)
-import Data.Text (Text, dropWhileEnd, strip)
+import Data.Maybe (Maybe (Just, Nothing), mapMaybe, maybe)
+import Data.Text (Text, dropWhileEnd, intercalate, strip, unpack)
+import GHC.IO (IO)
 import GHC.Real (fromIntegral)
 import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( ColumnReference (ColumnReference, columnName, tableName),
     JoinInformation (JoinInformation, joinType, tableAndAlias),
+    Parameter (Parameter, parameterNumber, parameterReference),
     PostgresqlExpression (ColumnExpression, ConstantExpression),
     PostgresqlJoinType (CrossJoin, FullJoin, InnerJoin, LeftJoin, RightJoin),
     TableAndAlias (TableAndAlias, alias, table),
     TableRelation (BaseTable, JoinTable),
+  )
+import PgQuery
+  ( A_Expr,
+    ColumnRef,
+    List,
+    Node,
+    Node'Node
+      ( Node'AExpr,
+        Node'BoolExpr,
+        Node'ColumnRef,
+        Node'List,
+        Node'ParamRef,
+        Node'ResTarget,
+        Node'String
+      ),
+    ParamRef,
+    ResTarget,
+    args,
+    fields,
+    fromClause,
+    items,
+    joinExpr,
+    lexpr,
+    maybe'node,
+    maybe'val,
+    name,
+    number,
+    parseSql,
+    quals,
+    rexpr,
+    selectStmt,
+    stmt,
+    stmts,
+    sval,
+    targetList,
+    updateStmt,
+    whereClause,
   )
 import PostgresqlSyntax.Ast
   ( AExpr (CExprAExpr, TypecastAExpr),
@@ -332,3 +375,114 @@ parseLimit text =
         IAexprConst val -> Just $ fromIntegral val
         _ -> Nothing
       _ -> Nothing
+
+parseParameters ::
+  Text ->
+  IO [Parameter]
+parseParameters text = do
+  eResult <- parseSql $ unpack text
+  case eResult of
+    Left _err ->
+      pure []
+    Right result -> do
+      let statements = toListOf (stmts . traverse . stmt) result
+
+          selectStatements = toListOf (traverse . selectStmt) statements
+          selectFromClauses = view (traverse . fromClause) selectStatements
+          selectWhereClauses = toListOf (traverse . whereClause) selectStatements
+
+          updateStatements = toListOf (traverse . updateStmt) statements
+          updateTargetList = view (traverse . targetList) updateStatements
+          updateFromClauses = view (traverse . fromClause) updateStatements
+          updateWhereClauses = toListOf (traverse . whereClause) updateStatements
+
+          targetLists = updateTargetList
+          joinClauses =
+            toListOf
+              (traverse . joinExpr . quals)
+              (selectFromClauses ++ updateFromClauses)
+          whereClauses = selectWhereClauses ++ updateWhereClauses
+
+          parameters =
+            concatMap
+              nodeToParameter
+              (targetLists ++ joinClauses ++ whereClauses)
+
+      pure parameters
+  where
+    nodeToParameter :: Node -> [Parameter]
+    nodeToParameter subNode =
+      case view maybe'node subNode of
+        Just (Node'BoolExpr expr) ->
+          let boolArgs = view args expr
+           in concatMap nodeToParameter boolArgs
+        Just (Node'AExpr expr) ->
+          aExprToColumnParams expr
+        Just (Node'ResTarget resTarget) ->
+          resTargetToColumnParams resTarget
+        _ -> []
+
+    aExprToColumnParams :: A_Expr -> [Parameter]
+    aExprToColumnParams aExpression =
+      case (preview lexpr aExpression, preview rexpr aExpression) of
+        (Just leftNode, Just rightNode) ->
+          case (view maybe'node leftNode, view maybe'node rightNode) of
+            (Just (Node'ColumnRef columnRef), Just (Node'ParamRef paramRef)) ->
+              [toParameter columnRef paramRef]
+            (Just (Node'ParamRef paramRef), Just (Node'ColumnRef columnRef)) ->
+              [toParameter columnRef paramRef]
+            (Just (Node'ColumnRef columnRef), Just (Node'List list)) ->
+              fmap (toParameter columnRef) $ listToParamRefs list
+            (Just (Node'List list), Just (Node'ColumnRef columnRef)) ->
+              fmap (toParameter columnRef) $ listToParamRefs list
+            _ ->
+              []
+        _ ->
+          []
+      where
+        toParameter ::
+          ColumnRef ->
+          ParamRef ->
+          Parameter
+        toParameter columnRef paramRef =
+          let parameterNumber = fromIntegral (view number paramRef)
+              allFields = view fields columnRef
+              parameterReference = intercalate "." (fmap fieldToText allFields)
+           in Parameter
+                { parameterNumber
+                , parameterReference
+                }
+          where
+            fieldToText :: Node -> Text
+            fieldToText subFieldNode =
+              case view maybe'node subFieldNode of
+                Just (Node'String str) -> view sval str
+                _ -> ""
+
+    listToParamRefs ::
+      List ->
+      [ParamRef]
+    listToParamRefs list =
+      mapMaybe nodeToParamRef (view items list)
+
+    nodeToParamRef :: Node -> Maybe ParamRef
+    nodeToParamRef node =
+      case view maybe'node node of
+        Just (Node'ParamRef paramRef) -> Just paramRef
+        _ -> Nothing
+
+    resTargetToColumnParams :: ResTarget -> [Parameter]
+    resTargetToColumnParams resTarget =
+      case view maybe'val resTarget of
+        Nothing ->
+          []
+        Just node ->
+          case view maybe'node node of
+            Just (Node'ParamRef paramRef) ->
+              [ Parameter
+                  { parameterNumber = fromIntegral (view number paramRef)
+                  , parameterReference = view name resTarget
+                  }
+              ]
+            _ ->
+              []

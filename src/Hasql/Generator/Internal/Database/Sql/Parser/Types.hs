@@ -5,10 +5,12 @@ module Hasql.Generator.Internal.Database.Sql.Parser.Types
     TableAndAlias (..),
     JoinInformation (..),
     TableRelation (..),
+    Parameter (..),
   )
 where
 
 import Data.Eq (Eq)
+import Data.Int (Int)
 import Data.Maybe (Maybe)
 import Data.Text (Text)
 import GHC.Show (Show)
@@ -48,4 +50,10 @@ data JoinInformation = JoinInformation
 data TableRelation
   = BaseTable TableAndAlias
   | JoinTable JoinInformation
+  deriving stock (Show, Eq)
+
+data Parameter = Parameter
+  { parameterNumber :: Int
+  , parameterReference :: Text
+  }
   deriving stock (Show, Eq)

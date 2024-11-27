@@ -471,5 +471,52 @@ spec = do
         actual <- parseParameters query
         sortParameters actual `shouldBe` expected
 
+    describe "When given a delete statement" $ do
+      it "Parses the parameters from join clauses and where clauses" $ do
+        let query =
+              " delete from users \
+              \ using users as u \
+              \ left outer join nicknames n on \
+              \   n.user_id = u.id \
+              \   and n.long_version = $1 \
+              \ where \
+              \   users.id = u.id  \
+              \   and n.short_version != $2;"
+
+            expected =
+              [ Parameter
+                  { parameterNumber = 1
+                  , parameterReference = "n.long_version"
+                  }
+              , Parameter
+                  { parameterNumber = 2
+                  , parameterReference = "n.short_version"
+                  }
+              ]
+        actual <- parseParameters query
+        sortParameters actual `shouldBe` expected
+
+    describe "When given an insert statement" $ do
+      it "Parses the parameters from join clauses and where clauses" $ do
+        let query =
+              " insert into users (name) \
+              \ select long_version from nicknames n \
+              \   join preferences p on p.casual_name = n.short_version \
+              \ where n.short_version = $1 \
+              \   and p.use_dark_mode = $2;"
+
+            expected =
+              [ Parameter
+                  { parameterNumber = 1
+                  , parameterReference = "n.short_version"
+                  }
+              , Parameter
+                  { parameterNumber = 2
+                  , parameterReference = "p.use_dark_mode"
+                  }
+              ]
+        actual <- parseParameters query
+        sortParameters actual `shouldBe` expected
+
 sortParameters :: [Parameter] -> [Parameter]
 sortParameters = sortBy (\x y -> compare x.parameterNumber y.parameterNumber)

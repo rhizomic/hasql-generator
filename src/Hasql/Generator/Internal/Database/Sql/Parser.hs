@@ -12,7 +12,7 @@ import Control.Monad ((=<<))
 import Data.Bool (Bool (False, True))
 import Data.Either (Either (Left, Right))
 import Data.Eq ((==))
-import Data.Foldable (concat, concatMap, foldMap)
+import Data.Foldable (concatMap, foldMap)
 import Data.Function (($), (.))
 import Data.Functor (fmap)
 import Data.Int (Int)
@@ -51,15 +51,14 @@ import PgQuery
       ),
     ParamRef,
     ResTarget,
-    SelectStmt,
-    UpdateStmt,
     args,
-    commonTableExpr,
     ctequery,
     ctes,
+    deleteStmt,
     fields,
     fromClause,
     indirection,
+    insertStmt,
     items,
     joinExpr,
     lexpr,
@@ -77,6 +76,7 @@ import PgQuery
     sval,
     targetList,
     updateStmt,
+    usingClause,
     whereClause,
     withClause,
   )
@@ -405,29 +405,38 @@ parseParameters text = do
     nodesToParameters :: [Node] -> [Parameter]
     nodesToParameters statements =
       let selectStatements = toListOf (traverse . selectStmt) statements
-
           selectFromClauses = view (traverse . fromClause) selectStatements
           selectWhereClauses = toListOf (traverse . whereClause) selectStatements
 
           updateStatements = toListOf (traverse . updateStmt) statements
-
           updateTargetList = view (traverse . targetList) updateStatements
           updateFromClauses = view (traverse . fromClause) updateStatements
           updateWhereClauses = toListOf (traverse . whereClause) updateStatements
+
+          deleteStatements = toListOf (traverse . deleteStmt) statements
+          deleteUsingClauses = view (traverse . usingClause) deleteStatements
+          deleteWhereClauses = toListOf (traverse . whereClause) deleteStatements
+
+          insertStatements = toListOf (traverse . insertStmt) statements
+          insertSelectStatements = toListOf (traverse . selectStmt . selectStmt) insertStatements
+          insertSelectFromClauses = view (traverse . fromClause) insertSelectStatements
+          insertSelectWhereClauses = toListOf (traverse . whereClause) insertSelectStatements
 
           -- TODO: Other target lists?
           targetLists = updateTargetList
           joinClauses =
             toListOf
               (traverse . joinExpr . quals)
-              (selectFromClauses ++ updateFromClauses)
-          whereClauses = selectWhereClauses ++ updateWhereClauses
+              (selectFromClauses ++ updateFromClauses ++ deleteUsingClauses ++ insertSelectFromClauses)
+          whereClauses = selectWhereClauses ++ updateWhereClauses ++ deleteWhereClauses ++ insertSelectWhereClauses
 
           parameters = concatMap nodeToParameters (targetLists ++ joinClauses ++ whereClauses)
 
           selectCtes = view (traverse . withClause . ctes) selectStatements
           updateCtes = view (traverse . withClause . ctes) updateStatements
-          cteNodes = concatMap nodeToCommonTableExpressionNodes (selectCtes ++ updateCtes)
+          deleteCtes = view (traverse . withClause . ctes) deleteStatements
+          insertCtes = view (traverse . withClause . ctes) insertStatements
+          cteNodes = concatMap nodeToCommonTableExpressionNodes (selectCtes ++ updateCtes ++ deleteCtes ++ insertCtes)
 
           -- We have to check for an empty list here, or this will never
           -- terminate.
@@ -469,8 +478,6 @@ parseParameters text = do
               fmap (toParameter columnRef) $ listToParamRefs list
             (Just (Node'List list), Just (Node'ColumnRef columnRef)) ->
               fmap (toParameter columnRef) $ listToParamRefs list
-            -- TODO:
-            -- (Just (Node'ParamRef paramRef), Just (Node'SubLink subLink)) ->
             (_, Just (Node'SubLink subLink)) ->
               nodesToParameters $ toListOf subselect subLink
             (Just (Node'SubLink subLink), _) ->

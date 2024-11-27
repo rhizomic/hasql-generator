@@ -9,16 +9,18 @@ where
 import Control.Applicative (pure)
 import Control.Lens (preview, toListOf, traverse, view)
 import Control.Monad ((=<<))
+import Data.Bool (Bool (False, True))
 import Data.Either (Either (Left, Right))
 import Data.Eq ((==))
-import Data.Foldable (concatMap, foldMap)
+import Data.Foldable (concat, concatMap, foldMap)
 import Data.Function (($), (.))
 import Data.Functor (fmap)
 import Data.Int (Int)
-import Data.List ((++))
+import Data.List (null, (++))
 import Data.List.NonEmpty (head, nonEmpty)
 import Data.List.NonEmpty.Extra (NonEmpty)
 import Data.Maybe (Maybe (Just, Nothing), mapMaybe, maybe)
+import Data.Monoid ((<>))
 import Data.Text (Text, dropWhileEnd, intercalate, strip, unpack)
 import GHC.IO (IO)
 import GHC.Real (fromIntegral)
@@ -40,16 +42,24 @@ import PgQuery
       ( Node'AExpr,
         Node'BoolExpr,
         Node'ColumnRef,
+        Node'CommonTableExpr,
         Node'List,
         Node'ParamRef,
         Node'ResTarget,
-        Node'String
+        Node'String,
+        Node'SubLink
       ),
     ParamRef,
     ResTarget,
+    SelectStmt,
+    UpdateStmt,
     args,
+    commonTableExpr,
+    ctequery,
+    ctes,
     fields,
     fromClause,
+    indirection,
     items,
     joinExpr,
     lexpr,
@@ -63,10 +73,12 @@ import PgQuery
     selectStmt,
     stmt,
     stmts,
+    subselect,
     sval,
     targetList,
     updateStmt,
     whereClause,
+    withClause,
   )
 import PostgresqlSyntax.Ast
   ( AExpr (CExprAExpr, TypecastAExpr),
@@ -128,8 +140,8 @@ parseAsExpression text =
               { tableName = Nothing
               , columnName = unwrapIdent columnId
               }
-        Just indirection ->
-          case head indirection of
+        Just indirectionEl ->
+          case head indirectionEl of
             AttrNameIndirectionEl columnName ->
               Just . ColumnExpression $
                 ColumnReference
@@ -386,16 +398,24 @@ parseParameters text = do
       pure []
     Right result -> do
       let statements = toListOf (stmts . traverse . stmt) result
+          parameters = nodesToParameters statements
 
-          selectStatements = toListOf (traverse . selectStmt) statements
+      pure parameters
+  where
+    nodesToParameters :: [Node] -> [Parameter]
+    nodesToParameters statements =
+      let selectStatements = toListOf (traverse . selectStmt) statements
+
           selectFromClauses = view (traverse . fromClause) selectStatements
           selectWhereClauses = toListOf (traverse . whereClause) selectStatements
 
           updateStatements = toListOf (traverse . updateStmt) statements
+
           updateTargetList = view (traverse . targetList) updateStatements
           updateFromClauses = view (traverse . fromClause) updateStatements
           updateWhereClauses = toListOf (traverse . whereClause) updateStatements
 
+          -- TODO: Other target lists?
           targetLists = updateTargetList
           joinClauses =
             toListOf
@@ -403,27 +423,41 @@ parseParameters text = do
               (selectFromClauses ++ updateFromClauses)
           whereClauses = selectWhereClauses ++ updateWhereClauses
 
-          parameters =
-            concatMap
-              nodeToParameter
-              (targetLists ++ joinClauses ++ whereClauses)
+          parameters = concatMap nodeToParameters (targetLists ++ joinClauses ++ whereClauses)
 
-      pure parameters
-  where
-    nodeToParameter :: Node -> [Parameter]
-    nodeToParameter subNode =
+          selectCtes = view (traverse . withClause . ctes) selectStatements
+          updateCtes = view (traverse . withClause . ctes) updateStatements
+          cteNodes = concatMap nodeToCommonTableExpressionNodes (selectCtes ++ updateCtes)
+
+          -- We have to check for an empty list here, or this will never
+          -- terminate.
+          cteParameters = case null cteNodes of
+            True -> []
+            False -> nodesToParameters cteNodes
+       in parameters ++ cteParameters
+      where
+        nodeToCommonTableExpressionNodes :: Node -> [Node]
+        nodeToCommonTableExpressionNodes subNode =
+          case view maybe'node subNode of
+            Just (Node'CommonTableExpr cte) -> [view ctequery cte]
+            _ -> []
+
+    nodeToParameters :: Node -> [Parameter]
+    nodeToParameters subNode =
       case view maybe'node subNode of
         Just (Node'BoolExpr expr) ->
           let boolArgs = view args expr
-           in concatMap nodeToParameter boolArgs
+           in concatMap nodeToParameters boolArgs
         Just (Node'AExpr expr) ->
-          aExprToColumnParams expr
+          aExprToParameters expr
         Just (Node'ResTarget resTarget) ->
-          resTargetToColumnParams resTarget
+          resTargetToParameters resTarget
+        Just (Node'SubLink subLink) ->
+          nodesToParameters $ toListOf subselect subLink
         _ -> []
 
-    aExprToColumnParams :: A_Expr -> [Parameter]
-    aExprToColumnParams aExpression =
+    aExprToParameters :: A_Expr -> [Parameter]
+    aExprToParameters aExpression =
       case (preview lexpr aExpression, preview rexpr aExpression) of
         (Just leftNode, Just rightNode) ->
           case (view maybe'node leftNode, view maybe'node rightNode) of
@@ -435,6 +469,12 @@ parseParameters text = do
               fmap (toParameter columnRef) $ listToParamRefs list
             (Just (Node'List list), Just (Node'ColumnRef columnRef)) ->
               fmap (toParameter columnRef) $ listToParamRefs list
+            -- TODO:
+            -- (Just (Node'ParamRef paramRef), Just (Node'SubLink subLink)) ->
+            (_, Just (Node'SubLink subLink)) ->
+              nodesToParameters $ toListOf subselect subLink
+            (Just (Node'SubLink subLink), _) ->
+              nodesToParameters $ toListOf subselect subLink
             _ ->
               []
         _ ->
@@ -447,17 +487,11 @@ parseParameters text = do
         toParameter columnRef paramRef =
           let parameterNumber = fromIntegral (view number paramRef)
               allFields = view fields columnRef
-              parameterReference = intercalate "." (fmap fieldToText allFields)
+              parameterReference = intercalate "." (fmap nodeToText allFields)
            in Parameter
                 { parameterNumber
                 , parameterReference
                 }
-          where
-            fieldToText :: Node -> Text
-            fieldToText subFieldNode =
-              case view maybe'node subFieldNode of
-                Just (Node'String str) -> view sval str
-                _ -> ""
 
     listToParamRefs ::
       List ->
@@ -471,18 +505,28 @@ parseParameters text = do
         Just (Node'ParamRef paramRef) -> Just paramRef
         _ -> Nothing
 
-    resTargetToColumnParams :: ResTarget -> [Parameter]
-    resTargetToColumnParams resTarget =
+    resTargetToParameters :: ResTarget -> [Parameter]
+    resTargetToParameters resTarget =
       case view maybe'val resTarget of
         Nothing ->
           []
         Just node ->
           case view maybe'node node of
             Just (Node'ParamRef paramRef) ->
-              [ Parameter
-                  { parameterNumber = fromIntegral (view number paramRef)
-                  , parameterReference = view name resTarget
-                  }
-              ]
+              let subNodes = view indirection resTarget
+                  suffix = case null subNodes of
+                    True -> ""
+                    False -> "." <> intercalate "." (fmap nodeToText subNodes)
+               in [ Parameter
+                      { parameterNumber = fromIntegral (view number paramRef)
+                      , parameterReference = view name resTarget <> suffix
+                      }
+                  ]
             _ ->
               []
+
+    nodeToText :: Node -> Text
+    nodeToText subFieldNode =
+      case view maybe'node subFieldNode of
+        Just (Node'String str) -> view sval str
+        _ -> ""

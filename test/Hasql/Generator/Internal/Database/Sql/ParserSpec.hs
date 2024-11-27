@@ -4,8 +4,10 @@
 module Hasql.Generator.Internal.Database.Sql.ParserSpec (spec) where
 
 import Data.Function (($))
+import Data.List (sortBy)
 import Data.List.NonEmpty (fromList)
 import Data.Maybe (Maybe (Just, Nothing))
+import Data.Ord (compare)
 import Hasql.Generator.Internal.Database.Sql.Parser
   ( parseJoins,
     parseLimit,
@@ -323,13 +325,12 @@ spec = do
 
       actual `shouldBe` expected
 
-  -- TODO: CTEs
   describe "parseParameters" do
     it "Parses no parameters from a query that lacks parameters" $ do
       let query = "select u.name from users"
           expected = []
       actual <- parseParameters query
-      actual `shouldBe` expected
+      sortParameters actual `shouldBe` expected
 
     describe "When given a select statement" $ do
       it "Parses the parameters from a where clause containing basic expressions" $ do
@@ -345,7 +346,7 @@ spec = do
                   }
               ]
         actual <- parseParameters query
-        actual `shouldBe` expected
+        sortParameters actual `shouldBe` expected
 
       it "Parses the parameters from a where clause containing an 'in'" $ do
         let query = "select u.name from users u where u.id in ($1, $2)"
@@ -360,7 +361,7 @@ spec = do
                   }
               ]
         actual <- parseParameters query
-        actual `shouldBe` expected
+        sortParameters actual `shouldBe` expected
 
       it "Parses the parameters from join clauses and where clauses" $ do
         let query = "select u.name, a.line_1 from users u left join addresses a on u.id = a.user_id and a.city = $1 where u.id = $2 or a.line_2 = $3"
@@ -379,7 +380,43 @@ spec = do
                   }
               ]
         actual <- parseParameters query
-        actual `shouldBe` expected
+        sortParameters actual `shouldBe` expected
+
+      it "Parses the parameters from a CTE" $ do
+        let query =
+              "with regional_sales as ( \
+              \    select region, sum(amount) as total_sales \
+              \    from orders \
+              \    where sale_metadata = $1 \
+              \    group by region \
+              \), top_regions AS ( \
+              \    select region \
+              \    from regional_sales \
+              \    where total_sales > (select sum(total_sales) / 10 from regional_sales where region = $2) \
+              \) \
+              \select region, \
+              \       product, \
+              \       sum(quantity) as product_units, \
+              \       sum(amount) as product_sales \
+              \from orders \
+              \where region in (select region from top_regions where postal_code = $3) \
+              \group by region, product; "
+            expected =
+              [ Parameter
+                  { parameterNumber = 1
+                  , parameterReference = "sale_metadata"
+                  }
+              , Parameter
+                  { parameterNumber = 2
+                  , parameterReference = "region"
+                  }
+              , Parameter
+                  { parameterNumber = 3
+                  , parameterReference = "postal_code"
+                  }
+              ]
+        actual <- parseParameters query
+        sortParameters actual `shouldBe` expected
 
     describe "When given an update statement" $ do
       it "Parses the parameters from a where clause containing basic expressions" $ do
@@ -395,4 +432,44 @@ spec = do
                   }
               ]
         actual <- parseParameters query
-        actual `shouldBe` expected
+        sortParameters actual `shouldBe` expected
+
+      it "Parses the parameters from join clauses and where clauses" $ do
+        let query =
+              " update users u \
+              \ set u.name = $1 \
+              \ from addresses a \
+              \   join nicknames n on n.user_id = u.id \
+              \     and n.short_version = $2 \
+              \     or n.long_version in ($3, $4) \
+              \ where \
+              \   a.user_id = u.id \
+              \   and a.city = $5;"
+
+            expected =
+              [ Parameter
+                  { parameterNumber = 1
+                  , parameterReference = "u.name"
+                  }
+              , Parameter
+                  { parameterNumber = 2
+                  , parameterReference = "n.short_version"
+                  }
+              , Parameter
+                  { parameterNumber = 3
+                  , parameterReference = "n.long_version"
+                  }
+              , Parameter
+                  { parameterNumber = 4
+                  , parameterReference = "n.long_version"
+                  }
+              , Parameter
+                  { parameterNumber = 5
+                  , parameterReference = "a.city"
+                  }
+              ]
+        actual <- parseParameters query
+        sortParameters actual `shouldBe` expected
+
+sortParameters :: [Parameter] -> [Parameter]
+sortParameters = sortBy (\x y -> compare x.parameterNumber y.parameterNumber)

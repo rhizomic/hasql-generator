@@ -310,21 +310,27 @@ spec = do
   describe "parseLimit" do
     it "returns the correct results for a query that has no specified limit" $ do
       let query = "select * from users"
-          actual = parseLimit query
+      result <- assertRight <$> parseSql (unpack query)
+
+      let actual = parseLimit result
           expected = Nothing
 
       actual `shouldBe` expected
 
     it "returns the correct results for a query that has a specified limit" $ do
       let query = "select * from users join addresses a on users.id = addresses.user_id limit 5"
-          actual = parseLimit query
+      result <- assertRight <$> parseSql (unpack query)
+
+      let actual = parseLimit result
           expected = Just 5
 
       actual `shouldBe` expected
 
     it "returns the correct results for a query that has a specified limit of 1" $ do
       let query = "select * from users limit 1"
-          actual = parseLimit query
+      result <- assertRight <$> parseSql (unpack query)
+
+      let actual = parseLimit result
           expected = Just 1
 
       actual `shouldBe` expected

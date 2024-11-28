@@ -2,6 +2,7 @@ module Hasql.Generator (generate) where
 
 import Control.Applicative (pure)
 import Data.ByteString (readFile)
+import Data.ByteString.Char8 (unpack)
 import Data.Either (Either (Left, Right), either)
 import Data.Function (const, ($), (.))
 import Data.Functor (fmap)
@@ -28,6 +29,7 @@ import Hasql.Generator.Types
       ),
   )
 import Hasql.Pool (Pool, use)
+import PgQuery (parseSql)
 import System.IO (FilePath)
 
 -- | Generates Hasql code for each of the provided 'QueryConfig's.
@@ -61,23 +63,29 @@ generate migrationFiles queries = do
     renderToFile :: Pool -> QueryConfig -> IO (Either (Text, QueryConfig) ())
     renderToFile pool query = do
       sql <- readFile query.inputFile
-      let mLimit = parseLimit $ decodeUtf8 sql
-
-      eMetadata <-
-        use pool . runTransaction $
-          parameterAndResultMetadata sql
-
-      case eMetadata of
+      eParseResult <- parseSql $ unpack sql
+      -- TODO: Clean all this branching up
+      case eParseResult of
         Left err ->
           pure $ Left (toError (pack $ show err), query)
-        Right metadata ->
-          case toHaskell sql metadata mLimit query.moduleName query.functionName of
-            Left renderingIssues ->
-              let errors = intercalate "\n" $ fmap renderingIssueToHuman renderingIssues
-               in pure $ Left (toError errors, query)
-            Right result -> do
-              writeFile query.outputLocation result
-              pure $ Right ()
+        Right parseResult -> do
+          let mLimit = parseLimit parseResult
+
+          eMetadata <-
+            use pool . runTransaction $
+              parameterAndResultMetadata sql
+
+          case eMetadata of
+            Left err ->
+              pure $ Left (toError (pack $ show err), query)
+            Right metadata ->
+              case toHaskell sql metadata mLimit query.moduleName query.functionName of
+                Left renderingIssues ->
+                  let errors = intercalate "\n" $ fmap renderingIssueToHuman renderingIssues
+                   in pure $ Left (toError errors, query)
+                Right result -> do
+                  writeFile query.outputLocation result
+                  pure $ Right ()
       where
         toError :: Text -> Text
         toError err =

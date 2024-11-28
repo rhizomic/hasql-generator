@@ -6,7 +6,6 @@ module Hasql.Generator.Internal.Database.Sql.Parser
   )
 where
 
-import Control.Applicative (pure)
 import Control.Lens (preview, toListOf, traverse, view)
 import Control.Monad ((=<<))
 import Data.Bool (Bool (False, True))
@@ -14,15 +13,14 @@ import Data.Either (Either (Left, Right))
 import Data.Eq ((==))
 import Data.Foldable (concatMap, foldMap)
 import Data.Function (($), (.))
-import Data.Functor (fmap)
+import Data.Functor (fmap, (<$>))
 import Data.Int (Int)
 import Data.List (null, (++))
 import Data.List.NonEmpty (head, nonEmpty)
 import Data.List.NonEmpty.Extra (NonEmpty)
-import Data.Maybe (Maybe (Just, Nothing), mapMaybe, maybe)
+import Data.Maybe (Maybe (Just, Nothing), listToMaybe, mapMaybe, maybe)
 import Data.Monoid ((<>))
-import Data.Text (Text, dropWhileEnd, intercalate, strip, unpack)
-import GHC.IO (IO)
+import Data.Text (Text, dropWhileEnd, intercalate, strip)
 import GHC.Real (fromIntegral)
 import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( ColumnReference (ColumnReference, columnName, tableName),
@@ -39,7 +37,8 @@ import PgQuery
     List,
     Node,
     Node'Node
-      ( Node'AExpr,
+      ( Node'AConst,
+        Node'AExpr,
         Node'BoolExpr,
         Node'ColumnRef,
         Node'CommonTableExpr,
@@ -61,13 +60,15 @@ import PgQuery
     indirection,
     insertStmt,
     items,
+    ival,
     joinExpr,
     lexpr,
+    limitCount,
+    maybe'ival,
     maybe'node,
     maybe'val,
     name,
     number,
-    parseSql,
     quals,
     rexpr,
     selectStmt,
@@ -318,76 +319,17 @@ parseJoins text =
         InnerJoinType -> InnerJoin
 
 parseLimit ::
-  Text ->
+  ParseResult ->
   Maybe Int
-parseLimit text =
-  case run preparableStmt query of
-    Left _err -> Nothing
-    Right result -> case result of
-      InsertPreparableStmt _insertStatement -> Nothing
-      UpdatePreparableStmt _updateStatement -> Nothing
-      DeletePreparableStmt _deleteStatement -> Nothing
-      CallPreparableStmt _callStatement -> Nothing
-      SelectPreparableStmt selectStatement -> parseSelectStatement selectStatement
+parseLimit result =
+  let mLimitNode = listToMaybe $ toListOf (stmts . traverse . stmt . selectStmt . limitCount) result
+   in nodeToConstInteger =<< mLimitNode
   where
-    query :: Text
-    query = dropWhileEnd (== ';') $ strip text
-
-    parseSelectStatement ::
-      Either SelectNoParens SelectWithParens ->
-      Maybe Int
-    parseSelectStatement = \case
-      Right selectWithParens -> parseSelectWithParens selectWithParens
-      Left selectNoParens -> parseSelectNoParens selectNoParens
-
-    parseSelectWithParens ::
-      SelectWithParens ->
-      Maybe Int
-    parseSelectWithParens = \case
-      WithParensSelectWithParens withParens -> parseSelectWithParens withParens
-      NoParensSelectWithParens noParens -> parseSelectNoParens noParens
-
-    parseSelectNoParens ::
-      SelectNoParens ->
-      Maybe Int
-    parseSelectNoParens (SelectNoParens _mWithClause _selectClause _mSortClause mSelectLimit _mForLockingClause) =
-      case mSelectLimit of
-        Nothing -> Nothing
-        Just (LimitOffsetSelectLimit limitClause _offsetClause) -> parseLimitClause limitClause
-        Just (OffsetLimitSelectLimit _offsetClause limitClause) -> parseLimitClause limitClause
-        Just (LimitSelectLimit limitClause) -> parseLimitClause limitClause
-        Just (OffsetSelectLimit _offsetClause) -> Nothing
-
-    parseLimitClause ::
-      LimitClause ->
-      Maybe Int
-    parseLimitClause = \case
-      FetchOnlyLimitClause _firstOrNext _mSelectFetchFirstValue _rowOrRows -> Nothing
-      LimitLimitClause selectLimitValue _mOffset -> parseSelectLimitValue selectLimitValue
-
-    parseSelectLimitValue ::
-      SelectLimitValue ->
-      Maybe Int
-    parseSelectLimitValue = \case
-      AllSelectLimitValue -> Nothing
-      ExprSelectLimitValue expr -> parseAExpr expr
-
-    parseAExpr ::
-      AExpr ->
-      Maybe Int
-    parseAExpr expr = case expr of
-      CExprAExpr cexpr -> parseCExpr cexpr
-      TypecastAExpr texpr _name -> parseAExpr texpr
-      _ -> Nothing
-
-    parseCExpr ::
-      CExpr ->
-      Maybe Int
-    parseCExpr expr = case expr of
-      AexprConstCExpr cexpr -> case cexpr of
-        IAexprConst val -> Just $ fromIntegral val
+    nodeToConstInteger :: Node -> Maybe Int
+    nodeToConstInteger subNode =
+      case view maybe'node subNode of
+        Just (Node'AConst aConst) -> fromIntegral . view ival <$> view maybe'ival aConst
         _ -> Nothing
-      _ -> Nothing
 
 parseParameters ::
   ParseResult ->

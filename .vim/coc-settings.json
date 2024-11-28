@@ -2,10 +2,39 @@
   "languageserver": {
     "haskell": {
       "command": "haskell-language-server-wrapper",
-      "args": ["--lsp"],
-      "rootPatterns": ["*.cabal", "stack.yaml", "cabal.project", "package.yaml", "hie.yaml"],
-      "filetypes": ["haskell", "hs"]
-     }
+      "args": [
+        "--lsp"
+      ],
+      "rootPatterns": [
+        "*.cabal",
+        "stack.yaml",
+        "cabal.project",
+        "package.yaml",
+        "hie.yaml"
+      ],
+      "filetypes": [
+        "haskell",
+        "hs"
+      ]
+    },
+    "nix": {
+      "command": "nil",
+      "filetypes": [
+        "nix"
+      ],
+      "rootPatterns": [
+        "flake.nix"
+      ],
+      "settings": {
+        "nil": {
+          "formatting": {
+            "command": [
+              "alejandra"
+            ]
+          }
+        }
+      }
+    }
   },
   "codeLens.enable": true,
   "diagnostic.checkCurrentLine": true,

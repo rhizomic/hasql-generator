@@ -4,10 +4,12 @@
 module Hasql.Generator.Internal.Database.Sql.ParserSpec (spec) where
 
 import Data.Function (($))
+import Data.Functor ((<$>))
 import Data.List (sortBy)
 import Data.List.NonEmpty (fromList)
 import Data.Maybe (Maybe (Just, Nothing))
 import Data.Ord (compare)
+import Data.Text (unpack)
 import Hasql.Generator.Internal.Database.Sql.Parser
   ( parseJoins,
     parseLimit,
@@ -20,12 +22,14 @@ import Hasql.Generator.Internal.Database.Sql.Parser.Types
     TableAndAlias (TableAndAlias, alias, table),
     TableRelation (BaseTable, JoinTable),
   )
+import PgQuery (parseSql)
 import Test.Hspec
   ( Spec,
     describe,
     it,
   )
 import Test.Hspec.Expectations.Pretty (shouldBe)
+import TestImport.Assertions (assertRight)
 
 spec :: Spec
 spec = do
@@ -328,14 +332,19 @@ spec = do
   describe "parseParameters" do
     it "Parses no parameters from a query that lacks parameters" $ do
       let query = "select u.name from users"
-          expected = []
-      actual <- parseParameters query
-      sortParameters actual `shouldBe` expected
+      result <- assertRight <$> parseSql (unpack query)
+
+      let expected = []
+          actual = sortParameters $ parseParameters result
+
+      actual `shouldBe` expected
 
     describe "When given a select statement" $ do
       it "Parses the parameters from a where clause containing basic expressions" $ do
         let query = "select u.name from users u where u.id = $1 or u.created_at > $2"
-            expected =
+        result <- assertRight <$> parseSql (unpack query)
+
+        let expected =
               [ Parameter
                   { parameterNumber = 1
                   , parameterReference = "u.id"
@@ -345,12 +354,15 @@ spec = do
                   , parameterReference = "u.created_at"
                   }
               ]
-        actual <- parseParameters query
-        sortParameters actual `shouldBe` expected
+            actual = sortParameters $ parseParameters result
+
+        actual `shouldBe` expected
 
       it "Parses the parameters from a where clause containing an 'in'" $ do
         let query = "select u.name from users u where u.id in ($1, $2)"
-            expected =
+        result <- assertRight <$> parseSql (unpack query)
+
+        let expected =
               [ Parameter
                   { parameterNumber = 1
                   , parameterReference = "u.id"
@@ -360,12 +372,15 @@ spec = do
                   , parameterReference = "u.id"
                   }
               ]
-        actual <- parseParameters query
-        sortParameters actual `shouldBe` expected
+            actual = sortParameters $ parseParameters result
+
+        actual `shouldBe` expected
 
       it "Parses the parameters from join clauses and where clauses" $ do
         let query = "select u.name, a.line_1 from users u left join addresses a on u.id = a.user_id and a.city = $1 where u.id = $2 or a.line_2 = $3"
-            expected =
+        result <- assertRight <$> parseSql (unpack query)
+
+        let expected =
               [ Parameter
                   { parameterNumber = 1
                   , parameterReference = "a.city"
@@ -379,8 +394,9 @@ spec = do
                   , parameterReference = "a.line_2"
                   }
               ]
-        actual <- parseParameters query
-        sortParameters actual `shouldBe` expected
+            actual = sortParameters $ parseParameters result
+
+        actual `shouldBe` expected
 
       it "Parses the parameters from a CTE" $ do
         let query =
@@ -401,7 +417,9 @@ spec = do
               \from orders \
               \where region in (select region from top_regions where postal_code = $3) \
               \group by region, product; "
-            expected =
+        result <- assertRight <$> parseSql (unpack query)
+
+        let expected =
               [ Parameter
                   { parameterNumber = 1
                   , parameterReference = "sale_metadata"
@@ -415,13 +433,15 @@ spec = do
                   , parameterReference = "postal_code"
                   }
               ]
-        actual <- parseParameters query
-        sortParameters actual `shouldBe` expected
+            actual = sortParameters $ parseParameters result
+        actual `shouldBe` expected
 
     describe "When given an update statement" $ do
       it "Parses the parameters from a where clause containing basic expressions" $ do
         let query = "update users set name = $1 where id = $2"
-            expected =
+        result <- assertRight <$> parseSql (unpack query)
+
+        let expected =
               [ Parameter
                   { parameterNumber = 1
                   , parameterReference = "name"
@@ -431,8 +451,9 @@ spec = do
                   , parameterReference = "id"
                   }
               ]
-        actual <- parseParameters query
-        sortParameters actual `shouldBe` expected
+            actual = sortParameters $ parseParameters result
+
+        actual `shouldBe` expected
 
       it "Parses the parameters from join clauses and where clauses" $ do
         let query =
@@ -445,8 +466,9 @@ spec = do
               \ where \
               \   a.user_id = u.id \
               \   and a.city = $5;"
+        result <- assertRight <$> parseSql (unpack query)
 
-            expected =
+        let expected =
               [ Parameter
                   { parameterNumber = 1
                   , parameterReference = "u.name"
@@ -468,8 +490,9 @@ spec = do
                   , parameterReference = "a.city"
                   }
               ]
-        actual <- parseParameters query
-        sortParameters actual `shouldBe` expected
+            actual = sortParameters $ parseParameters result
+
+        actual `shouldBe` expected
 
     describe "When given a delete statement" $ do
       it "Parses the parameters from join clauses and where clauses" $ do
@@ -482,8 +505,9 @@ spec = do
               \ where \
               \   users.id = u.id  \
               \   and n.short_version != $2;"
+        result <- assertRight <$> parseSql (unpack query)
 
-            expected =
+        let expected =
               [ Parameter
                   { parameterNumber = 1
                   , parameterReference = "n.long_version"
@@ -493,8 +517,9 @@ spec = do
                   , parameterReference = "n.short_version"
                   }
               ]
-        actual <- parseParameters query
-        sortParameters actual `shouldBe` expected
+            actual = sortParameters $ parseParameters result
+
+        actual `shouldBe` expected
 
     describe "When given an insert statement" $ do
       it "Parses the parameters from join clauses and where clauses" $ do
@@ -504,8 +529,9 @@ spec = do
               \   join preferences p on p.casual_name = n.short_version \
               \ where n.short_version = $1 \
               \   and p.use_dark_mode = $2;"
+        result <- assertRight <$> parseSql (unpack query)
 
-            expected =
+        let expected =
               [ Parameter
                   { parameterNumber = 1
                   , parameterReference = "n.short_version"
@@ -515,8 +541,9 @@ spec = do
                   , parameterReference = "p.use_dark_mode"
                   }
               ]
-        actual <- parseParameters query
-        sortParameters actual `shouldBe` expected
+            actual = sortParameters $ parseParameters result
+
+        actual `shouldBe` expected
 
 sortParameters :: [Parameter] -> [Parameter]
 sortParameters = sortBy (\x y -> compare x.parameterNumber y.parameterNumber)

@@ -50,6 +50,7 @@ import PgQuery
         Node'SubLink
       ),
     ParamRef,
+    ParseResult,
     ResTarget,
     args,
     ctequery,
@@ -389,20 +390,14 @@ parseLimit text =
       _ -> Nothing
 
 parseParameters ::
-  Text ->
-  IO [Parameter]
-parseParameters text = do
-  eResult <- parseSql $ unpack text
-  case eResult of
-    Left _err ->
-      pure []
-    Right result -> do
-      let statements = toListOf (stmts . traverse . stmt) result
-          parameters = nodesToParameters statements
-
-      pure parameters
+  ParseResult ->
+  [Parameter]
+parseParameters result =
+  let statements = toListOf (stmts . traverse . stmt) result
+   in nodesToParameters statements
   where
     nodesToParameters :: [Node] -> [Parameter]
+    nodesToParameters [] = []
     nodesToParameters statements =
       let selectStatements = toListOf (traverse . selectStmt) statements
           selectFromClauses = view (traverse . fromClause) selectStatements
@@ -438,11 +433,7 @@ parseParameters text = do
           insertCtes = view (traverse . withClause . ctes) insertStatements
           cteNodes = concatMap nodeToCommonTableExpressionNodes (selectCtes ++ updateCtes ++ deleteCtes ++ insertCtes)
 
-          -- We have to check for an empty list here, or this will never
-          -- terminate.
-          cteParameters = case null cteNodes of
-            True -> []
-            False -> nodesToParameters cteNodes
+          cteParameters = nodesToParameters cteNodes
        in parameters ++ cteParameters
       where
         nodeToCommonTableExpressionNodes :: Node -> [Node]

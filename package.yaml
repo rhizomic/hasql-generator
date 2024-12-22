@@ -88,7 +88,7 @@ dependencies:
   #
   # For background reading, see:
   # https://stackoverflow.blog/2020/10/14/improve-database-performance-with-connection-pooling/
-  - hasql-pool >= 1.2.0.2
+  - hasql-pool
 
   # Composable abstraction over retryable transactions for Hasql
   - hasql-transaction

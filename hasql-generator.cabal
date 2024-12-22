@@ -78,7 +78,7 @@ library
     , extra
     , filepath
     , hasql >=1.8
-    , hasql-pool >=1.2.0.2
+    , hasql-pool
     , hasql-transaction
     , lens
     , pcre-heavy
@@ -150,7 +150,7 @@ test-suite hasql-generator-test
     , filepath
     , hasql >=1.8
     , hasql-generator
-    , hasql-pool >=1.2.0.2
+    , hasql-pool
     , hasql-transaction
     , hspec
     , hspec-contrib

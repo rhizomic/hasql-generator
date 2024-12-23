@@ -2,10 +2,12 @@ module Hasql.Generator (generate) where
 
 import Control.Applicative (pure)
 import Control.Monad.IO.Class (MonadIO)
+import Data.Bool (Bool (False, True))
 import Data.ByteString (readFile)
 import Data.ByteString.Char8 (unpack)
-import Data.ByteString.Lazy (ByteString)
+import Data.ByteString.Lazy (ByteString, empty)
 import Data.Either (Either (Left, Right), either)
+import Data.Eq ((==))
 import Data.Function (const, id, ($), (.))
 import Data.Functor (fmap)
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
@@ -34,7 +36,7 @@ import Hasql.Pool (Pool, use)
 import PgQuery (parseSql)
 import System.IO (FilePath)
 import System.Process.Typed
-  ( ExitCode (ExitFailure, ExitSuccess),
+  ( ExitCode,
     proc,
     readProcess,
   )
@@ -49,13 +51,17 @@ generate ::
   IO (Either (NonEmpty (Text, QueryConfig)) ())
 generate schemaFile queries = do
   eResult <- withDb $ \dbSettings pool -> do
-    (exitCode, _stdOut, stdErr) <- loadSchema dbSettings
-    case exitCode of
-      ExitFailure _code ->
+    (_exitCode, _stdOut, stdErr) <- loadSchema dbSettings
+
+    -- We ignore the exitCode because psql still reports a success even when
+    -- encountering issues with executing the file. Instead, we use the
+    -- absence of content in stdErr as a measure of success.
+    case stdErr == empty of
+      False ->
         let errorMessage =
               "Could not render Hasql code due to an issue loading the schema: " <> pack (show stdErr)
          in pure . Left $ queriesWithError errorMessage
-      ExitSuccess -> do
+      True -> do
         renderResults <- traverse (renderToFile pool) queries
         let renderingIssues = mapMaybe leftToMaybe (toList renderResults)
         case nonEmpty renderingIssues of

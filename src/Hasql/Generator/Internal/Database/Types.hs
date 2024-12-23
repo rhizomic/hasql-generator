@@ -6,15 +6,10 @@ where
 import Data.ByteString (ByteString)
 import GHC.Show (Show)
 
--- | A collection of database settings.
-data DatabaseSettings = DatabaseSettings
+-- | A collection of database settings. All that's currently required for this
+--   to work with `tmp-postgres` is a host name.
+newtype DatabaseSettings = DatabaseSettings
   { host :: ByteString
   -- ^ The database host.
-  , port :: ByteString
-  -- ^ The database port.
-  , user :: ByteString
-  -- ^ The database user.
-  , databaseName :: ByteString
-  -- ^ The database name.
   }
   deriving stock (Show)

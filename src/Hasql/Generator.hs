@@ -4,7 +4,7 @@ import Control.Applicative (pure)
 import Data.ByteString (readFile)
 import Data.ByteString.Char8 (unpack)
 import Data.Either (Either (Left, Right), either)
-import Data.Function (const, ($), (.))
+import Data.Function (const, id, ($), (.))
 import Data.Functor (fmap)
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 import Data.Maybe (Maybe (Just, Nothing), mapMaybe)
@@ -42,7 +42,7 @@ generate ::
 generate migrationFiles queries = do
   migrations <- mapM readFile migrationFiles
 
-  withDb $ \pool -> do
+  eResult <- withDb $ \pool -> do
     eMigrationResult <- use pool . runTransaction $ do
       migrate migrations
 
@@ -50,14 +50,15 @@ generate migrationFiles queries = do
       Left err ->
         let errorMessage =
               "Could not render Hasql code due to a migration failure. Reason: " <> pack (show err)
-            issues = fmap (errorMessage,) queries
-         in pure $ Left issues
+         in pure . Left $ queriesWithError errorMessage
       Right () -> do
         renderResults <- traverse (renderToFile pool) queries
         let renderingIssues = mapMaybe leftToMaybe (toList renderResults)
         case nonEmpty renderingIssues of
           Just issues -> pure $ Left issues
           Nothing -> pure $ Right ()
+
+  pure $ either (Left . queriesWithError) id eResult
   where
     renderToFile :: Pool -> QueryConfig -> IO (Either (Text, QueryConfig) ())
     renderToFile pool query = do
@@ -92,6 +93,10 @@ generate migrationFiles queries = do
             <> pack (show query.inputFile)
             <> ". Reason(s): "
             <> err
+
+    queriesWithError :: Text -> NonEmpty (Text, QueryConfig)
+    queriesWithError errorMessage =
+      fmap (errorMessage,) queries
 
     leftToMaybe :: Either a b -> Maybe a
     leftToMaybe = either Just (const Nothing)

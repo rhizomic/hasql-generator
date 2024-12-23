@@ -1,8 +1,10 @@
 module Hasql.Generator (generate) where
 
 import Control.Applicative (pure)
+import Control.Monad.IO.Class (MonadIO)
 import Data.ByteString (readFile)
 import Data.ByteString.Char8 (unpack)
+import Data.ByteString.Lazy (ByteString)
 import Data.Either (Either (Left, Right), either)
 import Data.Function (const, id, ($), (.))
 import Data.Functor (fmap)
@@ -11,13 +13,14 @@ import Data.Maybe (Maybe (Just, Nothing), mapMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text, intercalate, pack)
 import Data.Text.IO (writeFile)
-import Data.Traversable (mapM, traverse)
+import Data.Traversable (traverse)
 import GHC.IO (IO)
 import GHC.Show (Show (show))
-import Hasql.Generator.Internal.Database (migrate, withDb)
+import Hasql.Generator.Internal.Database (withDb)
 import Hasql.Generator.Internal.Database.Sql (parameterAndResultMetadata)
 import Hasql.Generator.Internal.Database.Sql.Parser (parseLimit)
 import Hasql.Generator.Internal.Database.Transaction (runTransaction)
+import Hasql.Generator.Internal.Database.Types (DatabaseSettings (host))
 import Hasql.Generator.Internal.Renderer (renderingIssueToHuman, toHaskell)
 import Hasql.Generator.Types
   ( QueryConfig
@@ -30,28 +33,29 @@ import Hasql.Generator.Types
 import Hasql.Pool (Pool, use)
 import PgQuery (parseSql)
 import System.IO (FilePath)
+import System.Process.Typed
+  ( ExitCode (ExitFailure, ExitSuccess),
+    proc,
+    readProcess,
+  )
 
 -- | Generates Hasql code for each of the provided 'QueryConfig's.
 generate ::
-  -- | The paths to the migrations that should be run before attempting to
+  -- | The path to the schema file that should be executed before attempting to
   --   generate code.
-  [FilePath] ->
+  FilePath ->
   -- | The 'QueryConfig's to generate code for.
   NonEmpty QueryConfig ->
   IO (Either (NonEmpty (Text, QueryConfig)) ())
-generate migrationFiles queries = do
-  migrations <- mapM readFile migrationFiles
-
-  eResult <- withDb $ \pool -> do
-    eMigrationResult <- use pool . runTransaction $ do
-      migrate migrations
-
-    case eMigrationResult of
-      Left err ->
+generate schemaFile queries = do
+  eResult <- withDb $ \dbSettings pool -> do
+    (exitCode, _stdOut, stdErr) <- loadSchema dbSettings
+    case exitCode of
+      ExitFailure _code ->
         let errorMessage =
-              "Could not render Hasql code due to a migration failure. Reason: " <> pack (show err)
+              "Could not render Hasql code due to an issue loading the schema: " <> pack (show stdErr)
          in pure . Left $ queriesWithError errorMessage
-      Right () -> do
+      ExitSuccess -> do
         renderResults <- traverse (renderToFile pool) queries
         let renderingIssues = mapMaybe leftToMaybe (toList renderResults)
         case nonEmpty renderingIssues of
@@ -60,6 +64,19 @@ generate migrationFiles queries = do
 
   pure $ either (Left . queriesWithError) id eResult
   where
+    loadSchema :: (MonadIO m) => DatabaseSettings -> m (ExitCode, ByteString, ByteString)
+    loadSchema dbSettings = do
+      let cmd =
+            proc
+              "psql"
+              [ "-h"
+              , unpack dbSettings.host
+              , "-f"
+              , schemaFile
+              ]
+
+      readProcess cmd
+
     renderToFile :: Pool -> QueryConfig -> IO (Either (Text, QueryConfig) ())
     renderToFile pool query = do
       sql <- readFile query.inputFile

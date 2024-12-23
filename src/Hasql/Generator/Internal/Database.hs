@@ -2,7 +2,6 @@ module Hasql.Generator.Internal.Database
   ( runTmpPostgresWith,
     withDb,
     withPool,
-    migrate,
   )
 where
 
@@ -12,7 +11,6 @@ import Data.Bool (Bool (False, True))
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (hGetLine, pack, unwords)
 import Data.Either (Either (Left, Right))
-import Data.Foldable (traverse_)
 import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
 import Data.Maybe (Maybe (Just, Nothing))
@@ -22,7 +20,6 @@ import Data.Text (Text, isInfixOf)
 import Data.Text.Encoding (decodeUtf8)
 import GHC.IO.Handle (Handle)
 import Hasql.Connection (Settings)
-import Hasql.Generator.Internal.Database.Transaction (paramAndResultlessTransaction)
 import Hasql.Generator.Internal.Database.Types
   ( DatabaseSettings
       ( DatabaseSettings,
@@ -31,7 +28,6 @@ import Hasql.Generator.Internal.Database.Types
   )
 import Hasql.Pool (Pool, acquire, release)
 import Hasql.Pool.Config (settings, staticConnectionSettings)
-import Hasql.Transaction (Transaction)
 import System.Directory (findExecutable)
 import System.IO (IO)
 import System.IO.Temp (withSystemTempDirectory)
@@ -109,13 +105,9 @@ withPool databaseSettings action =
 
 -- | Runs an action using the connection pool for a temporary database.
 withDb ::
-  (Pool -> IO a) ->
+  (DatabaseSettings -> Pool -> IO a) ->
   IO (Either Text a)
 withDb action =
   runTmpPostgresWith $ \dbSettings ->
     withPool dbSettings $ \pool ->
-      action pool
-
--- | Migrates a series of migrations (in the order that they were provided).
-migrate :: [ByteString] -> Transaction ()
-migrate = traverse_ paramAndResultlessTransaction
+      action dbSettings pool

@@ -1,15 +1,16 @@
 import Control.Applicative (pure)
 import Data.ByteString (readFile)
 import Data.Either (Either (Left, Right))
+import Data.Foldable (traverse_)
 import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
 import Data.Monoid ((<>))
 import Data.Text (unpack)
 import Data.Traversable (mapM)
 import GHC.Err (error)
-import Hasql.Generator.Internal.Database (migrate, withDb)
+import Hasql.Generator.Internal.Database (withDb)
 import Hasql.Generator.Internal.Database.Sql.ParserSpec qualified as ParserSpec
-import Hasql.Generator.Internal.Database.Transaction (runTransaction)
+import Hasql.Generator.Internal.Database.Transaction (paramAndResultlessTransaction, runTransaction)
 import Hasql.Generator.Internal.DatabaseSpec qualified as DatabaseSpec
 import Hasql.Generator.Internal.RendererSpec qualified as RendererSpec
 import Hasql.GeneratorSpec qualified as GeneratorSpec
@@ -33,13 +34,13 @@ withMigratedDb ::
   (Pool -> IO ()) ->
   IO ()
 withMigratedDb action = do
-  eResult <- withDb $ \pool -> do
+  eResult <- withDb $ \_dbSettings pool -> do
     migrationFiles <- getMigrationFiles
     migrations <- mapM readFile migrationFiles
     migrations `shouldNotBe` []
 
     fmap assertRight <$> use pool . runTransaction $ do
-      migrate migrations
+      traverse_ paramAndResultlessTransaction migrations
 
     action pool
 

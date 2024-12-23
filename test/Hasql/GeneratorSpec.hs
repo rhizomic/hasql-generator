@@ -21,6 +21,7 @@ import Hasql.Generator.Types
         outputLocation
       ),
   )
+import System.Directory (removeFile)
 import System.FilePath (takeFileName)
 import System.IO (FilePath, readFile)
 import System.IO.Temp (withTempDirectory)
@@ -30,7 +31,7 @@ import Test.Hspec
     it,
   )
 import Test.Hspec.Golden (Golden, defaultGolden)
-import TestImport.Migrations (getMigrationFiles)
+import TestImport.Migrations (getMigrationFiles, migrationFilesToSchemaFile)
 
 spec :: Spec
 spec = do
@@ -47,9 +48,12 @@ spec = do
 testGeneratedCode :: FilePath -> IO (Golden String)
 testGeneratedCode inputFile = do
   migrationFiles <- getMigrationFiles
+  schemaFile <- migrationFilesToSchemaFile migrationFiles
+
   withTempDirectory "." "hasql-generator-spec" $ \tmpDir -> do
     let queryConfig = toQueryConfig tmpDir inputFile
-    actual <- generate migrationFiles (singleton queryConfig)
+    actual <- generate schemaFile (singleton queryConfig)
+    removeFile schemaFile
 
     case actual of
       Left renderingIssues ->

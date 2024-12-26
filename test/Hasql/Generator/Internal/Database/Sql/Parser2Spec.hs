@@ -303,6 +303,21 @@ spec = do
         actual `shouldBe` expected
 
     describe "When given a delete statement" $ do
+      it "returns the correct results for a query that has no joins" $ do
+        let query = "delete from users"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              ]
+
+        actual `shouldBe` expected
+
       it "returns the correct results for a query that joins via USING" $ do
         let query =
               "delete from users u \
@@ -383,6 +398,88 @@ spec = do
                         TableAndAlias
                           { table = "nicknames"
                           , alias = Just "n"
+                          }
+                    , joinType = LeftJoin
+                    }
+              ]
+
+        actual `shouldBe` expected
+
+    describe "When given an update statement" $ do
+      it "returns the correct results for a query that has no joins" $ do
+        let query = "update users set name = $1"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that joins via FROM" $ do
+        let query =
+              "update users u \
+              \set name = n.full_name \
+              \from nicknames n \
+              \where n.user_id = u.id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Just "u"
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "nicknames"
+                          , alias = Just "n"
+                          }
+                    , joinType = InnerJoin
+                    }
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that joins via FROM and regular JOINs" $ do
+        let query =
+              "update users u \
+              \set name = n.full_name \
+              \from nicknames n \
+              \left join addresses a on n.user_id = a.user_id \
+              \where n.user_id = u.id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Just "u"
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "nicknames"
+                          , alias = Just "n"
+                          }
+                    , joinType = InnerJoin
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Just "a"
                           }
                     , joinType = LeftJoin
                     }

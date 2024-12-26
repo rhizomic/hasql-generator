@@ -149,23 +149,7 @@ parseParameters result =
               (traverse . joinExpr . quals)
               (selectFromClauses ++ updateFromClauses ++ deleteUsingClauses ++ insertSelectFromClauses)
           whereClauses = selectWhereClauses ++ updateWhereClauses ++ deleteWhereClauses ++ insertSelectWhereClauses
-
-          parameters = concatMap nodeToParameters (targetLists ++ joinClauses ++ whereClauses)
-
-          selectCtes = view (traverse . withClause . ctes) selectStatements
-          updateCtes = view (traverse . withClause . ctes) updateStatements
-          deleteCtes = view (traverse . withClause . ctes) deleteStatements
-          insertCtes = view (traverse . withClause . ctes) insertStatements
-          cteNodes = concatMap nodeToCommonTableExpressionNodes (selectCtes ++ updateCtes ++ deleteCtes ++ insertCtes)
-
-          cteParameters = nodesToParameters cteNodes
-       in parameters ++ cteParameters
-      where
-        nodeToCommonTableExpressionNodes :: Node -> [Node]
-        nodeToCommonTableExpressionNodes subNode =
-          case view maybe'node subNode of
-            Just (Node'CommonTableExpr cte) -> [view ctequery cte]
-            _ -> []
+       in concatMap nodeToParameters (targetLists ++ joinClauses ++ whereClauses)
 
     nodeToParameters :: Node -> [Parameter]
     nodeToParameters subNode =

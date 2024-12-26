@@ -28,278 +28,367 @@ import TestImport.Assertions (assertRight)
 
 spec :: Spec
 spec = do
-  describe "parseTableRelations" do
-    it "returns the correct results for a query that has no joins" $ do
-      let query = "select * from users"
-      result <- assertRight <$> parseSql (unpack query)
+  describe "parseTableRelations" $ do
+    describe "When given a select statement" $ do
+      it "returns the correct results for a query that has no joins" $ do
+        let query = "select * from users"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseTableRelations result
-          expected =
-            [ BaseTable
-                TableAndAlias
-                  { table = "users"
-                  , alias = Nothing
-                  }
-            ]
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              ]
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
 
-    it "returns the correct results for a query that has an implicit inner join" $ do
-      let query = "select email, line_1 from users join addresses on users.id = addresses.user_id"
-      result <- assertRight <$> parseSql (unpack query)
+      it "returns the correct results for a query that has an implicit inner join" $ do
+        let query = "select email, line_1 from users join addresses on users.id = addresses.user_id"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseTableRelations result
-          expected =
-            [ BaseTable $
-                TableAndAlias
-                  { table = "users"
-                  , alias = Nothing
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "addresses"
-                        , alias = Nothing
-                        }
-                  , joinType = InnerJoin
-                  }
-            ]
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Nothing
+                          }
+                    , joinType = InnerJoin
+                    }
+              ]
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
 
-    it "returns the correct results for a query that has an explicit inner join" $ do
-      let query = "select email, line_1 from users inner join addresses on users.id = addresses.user_id"
-      result <- assertRight <$> parseSql (unpack query)
+      it "returns the correct results for a query that has an explicit inner join" $ do
+        let query = "select email, line_1 from users inner join addresses on users.id = addresses.user_id"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseTableRelations result
-          expected =
-            [ BaseTable $
-                TableAndAlias
-                  { table = "users"
-                  , alias = Nothing
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "addresses"
-                        , alias = Nothing
-                        }
-                  , joinType = InnerJoin
-                  }
-            ]
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Nothing
+                          }
+                    , joinType = InnerJoin
+                    }
+              ]
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
 
-    it "returns the correct results for a query that has an explicit left join" $ do
-      let query = "select email, line_1 from users left join addresses on users.id = addresses.user_id"
-      result <- assertRight <$> parseSql (unpack query)
+      it "returns the correct results for a query that has an explicit left join" $ do
+        let query = "select email, line_1 from users left join addresses on users.id = addresses.user_id"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseTableRelations result
-          expected =
-            [ BaseTable $
-                TableAndAlias
-                  { table = "users"
-                  , alias = Nothing
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "addresses"
-                        , alias = Nothing
-                        }
-                  , joinType = LeftJoin
-                  }
-            ]
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Nothing
+                          }
+                    , joinType = LeftJoin
+                    }
+              ]
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
 
-    it "returns the correct results for a query that has multiple types of joins" $ do
-      let query =
-            "select email, line_1, phone \
-            \from users \
-            \join addresses on users.id = addresses.user_id \
-            \left join phone_numbers on users.id = phone_numbers.user_id"
-      result <- assertRight <$> parseSql (unpack query)
+      it "returns the correct results for a query that has multiple types of joins" $ do
+        let query =
+              "select email, line_1, phone \
+              \from users \
+              \join addresses on users.id = addresses.user_id \
+              \left join phone_numbers on users.id = phone_numbers.user_id"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseTableRelations result
-          expected =
-            [ BaseTable $
-                TableAndAlias
-                  { table = "users"
-                  , alias = Nothing
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "addresses"
-                        , alias = Nothing
-                        }
-                  , joinType = InnerJoin
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "phone_numbers"
-                        , alias = Nothing
-                        }
-                  , joinType = LeftJoin
-                  }
-            ]
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Nothing
+                          }
+                    , joinType = InnerJoin
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "phone_numbers"
+                          , alias = Nothing
+                          }
+                    , joinType = LeftJoin
+                    }
+              ]
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
 
-    it "returns the correct results for a query that has multiple left joins" $ do
-      let query =
-            "select email, line_1, phone, use_2fa \
-            \from users \
-            \left join addresses on users.id = addresses.user_id \
-            \left join phone_numbers on users.id = phone_numbers.user_id \
-            \left join mfa_settings on phone_numbers.id = mfa_settings.phone_number_id"
-      result <- assertRight <$> parseSql (unpack query)
+      it "returns the correct results for a query that has multiple left joins" $ do
+        let query =
+              "select email, line_1, phone, use_2fa \
+              \from users \
+              \left join addresses on users.id = addresses.user_id \
+              \left join phone_numbers on users.id = phone_numbers.user_id \
+              \left join mfa_settings on phone_numbers.id = mfa_settings.phone_number_id"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseTableRelations result
-          expected =
-            [ BaseTable $
-                TableAndAlias
-                  { table = "users"
-                  , alias = Nothing
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "addresses"
-                        , alias = Nothing
-                        }
-                  , joinType = LeftJoin
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "phone_numbers"
-                        , alias = Nothing
-                        }
-                  , joinType = LeftJoin
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "mfa_settings"
-                        , alias = Nothing
-                        }
-                  , joinType = LeftJoin
-                  }
-            ]
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Nothing
+                          }
+                    , joinType = LeftJoin
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "phone_numbers"
+                          , alias = Nothing
+                          }
+                    , joinType = LeftJoin
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "mfa_settings"
+                          , alias = Nothing
+                          }
+                    , joinType = LeftJoin
+                    }
+              ]
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
 
-    it "returns the correct results for a query that has multiple joins and multiple aliases" $ do
-      let query =
-            "select email, line_1, phone, use_2fa \
-            \from users u \
-            \join addresses a on u.id = a.user_id \
-            \left join phone_numbers p on u.id = p.user_id \
-            \left join mfa_settings on p.id = mfa_settings.phone_number_id"
-      result <- assertRight <$> parseSql (unpack query)
+      it "returns the correct results for a query that has multiple joins and multiple aliases" $ do
+        let query =
+              "select email, line_1, phone, use_2fa \
+              \from users u \
+              \join addresses a on u.id = a.user_id \
+              \left join phone_numbers p on u.id = p.user_id \
+              \left join mfa_settings on p.id = mfa_settings.phone_number_id"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseTableRelations result
-          expected =
-            [ BaseTable $
-                TableAndAlias
-                  { table = "users"
-                  , alias = Just "u"
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "addresses"
-                        , alias = Just "a"
-                        }
-                  , joinType = InnerJoin
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "phone_numbers"
-                        , alias = Just "p"
-                        }
-                  , joinType = LeftJoin
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "mfa_settings"
-                        , alias = Nothing
-                        }
-                  , joinType = LeftJoin
-                  }
-            ]
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Just "u"
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Just "a"
+                          }
+                    , joinType = InnerJoin
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "phone_numbers"
+                          , alias = Just "p"
+                          }
+                    , joinType = LeftJoin
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "mfa_settings"
+                          , alias = Nothing
+                          }
+                    , joinType = LeftJoin
+                    }
+              ]
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
 
-    it "returns the correct results for a query that has a full join" $ do
-      let query =
-            "select * \
-            \from users \
-            \full join addresses on addresses.user_id = users.id"
-      result <- assertRight <$> parseSql (unpack query)
+      it "returns the correct results for a query that has a full join" $ do
+        let query =
+              "select * \
+              \from users \
+              \full join addresses on addresses.user_id = users.id"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseTableRelations result
-          expected =
-            [ BaseTable $
-                TableAndAlias
-                  { table = "users"
-                  , alias = Nothing
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "addresses"
-                        , alias = Nothing
-                        }
-                  , joinType = FullJoin
-                  }
-            ]
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Nothing
+                          }
+                    , joinType = FullJoin
+                    }
+              ]
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
 
-    it "returns the correct results for a query that has a cross join" $ do
-      let query =
-            "select * \
-            \from users \
-            \cross join addresses"
-      result <- assertRight <$> parseSql (unpack query)
+      it "returns the correct results for a query that has a cross join" $ do
+        let query =
+              "select * \
+              \from users \
+              \cross join addresses"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseTableRelations result
-          expected =
-            [ BaseTable $
-                TableAndAlias
-                  { table = "users"
-                  , alias = Nothing
-                  }
-            , JoinTable $
-                JoinInformation
-                  { tableAndAlias =
-                      TableAndAlias
-                        { table = "addresses"
-                        , alias = Nothing
-                        }
-                  , joinType = InnerJoin
-                  }
-            ]
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Nothing
+                          }
+                    , joinType = InnerJoin
+                    }
+              ]
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
+
+    describe "When given a delete statement" $ do
+      it "returns the correct results for a query that joins via USING" $ do
+        let query =
+              "delete from users u \
+              \using nicknames n, \
+              \addresses a \
+              \where u.name = n.full_name \
+              \and a.user_id = u.id \
+              \and a.postal_code = $1"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Just "u"
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "nicknames"
+                          , alias = Just "n"
+                          }
+                    , joinType = InnerJoin
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Just "a"
+                          }
+                    , joinType = InnerJoin
+                    }
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that joins via USING and regular JOINs" $ do
+        let query =
+              "delete from users \
+              \using users u \
+              \join addresses a on a.user_id = u.id \
+              \left outer join nicknames n on u.name = n.full_name \
+              \where a.postal_code = $1 \
+              \and n.last_name = $2"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "users"
+                          , alias = Just "u"
+                          }
+                    , joinType = InnerJoin
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "addresses"
+                          , alias = Just "a"
+                          }
+                    , joinType = InnerJoin
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "nicknames"
+                          , alias = Just "n"
+                          }
+                    , joinType = LeftJoin
+                    }
+              ]
+
+        actual `shouldBe` expected
 
   describe "parseLimit" do
     it "returns the correct results for a query that has no specified limit" $ do

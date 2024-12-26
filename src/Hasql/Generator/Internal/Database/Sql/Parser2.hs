@@ -14,7 +14,7 @@ import Data.Functor (fmap, (<$>))
 import Data.Int (Int)
 import Data.List (null, (++))
 import Data.List.NonEmpty (head, nonEmpty)
-import Data.Maybe (Maybe (Just, Nothing), listToMaybe, mapMaybe, maybe, maybeToList)
+import Data.Maybe (Maybe (Just, Nothing), catMaybes, listToMaybe, mapMaybe, maybe, maybeToList)
 import Data.Monoid ((<>))
 import Data.Text (Text, intercalate)
 import GHC.Real (fromIntegral)
@@ -28,6 +28,7 @@ import Hasql.Generator.Internal.Database.Sql.Parser2.Types
 import PgQuery
   ( A_Expr,
     ColumnRef,
+    DeleteStmt,
     JoinExpr,
     JoinType
       ( JOIN_ANTI,
@@ -60,6 +61,7 @@ import PgQuery
     ParseResult,
     RangeVar,
     ResTarget,
+    SelectStmt,
     aliasname,
     args,
     ctequery,
@@ -77,6 +79,7 @@ import PgQuery
     lexpr,
     limitCount,
     maybe'alias,
+    maybe'deleteStmt,
     maybe'ival,
     maybe'joinExpr,
     maybe'node,
@@ -87,6 +90,7 @@ import PgQuery
     quals,
     rangeVar,
     rarg,
+    relation,
     relname,
     rexpr,
     selectStmt,
@@ -250,46 +254,92 @@ parseTableRelations result =
     nodeToTableRelations :: Node -> [TableRelation]
     nodeToTableRelations statement =
       let mSelectStatement = view maybe'selectStmt statement
-          selectFromClause =
-            case mSelectStatement of
-              Nothing -> Nothing
-              Just selectStatement -> head <$> nonEmpty (view fromClause selectStatement)
-          -- TODO: Parse selectWhereClause
+          selectRelations = maybe [] getRelationsFromSelect mSelectStatement
 
-          selectRelations = maybe [] selectTableRelations selectFromClause
+          mDeleteStatement = view maybe'deleteStmt statement
+          deleteRelations = maybe [] getRelationsFromDelete mDeleteStatement
        in -- TODO: Other types of queries
-
-          selectRelations
-
-    selectTableRelations :: Node -> [TableRelation]
-    selectTableRelations fromClauseNode =
-      case view maybe'joinExpr fromClauseNode of
-        Nothing ->
-          let tableAlias = rangeVarToTableAlias $ view rangeVar fromClauseNode
-           in [BaseTable tableAlias]
-        Just joinExpression ->
-          joinExpressionToTableRelations joinExpression
-
-    joinExpressionToTableRelations :: JoinExpr -> [TableRelation]
-    joinExpressionToTableRelations joinExpression =
-      let leftArg = view larg joinExpression
-       in case view maybe'joinExpr leftArg of
-            Nothing ->
-              let leftRangeVar = view rangeVar leftArg
-                  baseTableAlias = rangeVarToTableAlias leftRangeVar
-                  joinTable = maybeToList rightArgToTableRelation
-               in BaseTable baseTableAlias : joinTable
-            Just join ->
-              joinExpressionToTableRelations join
-                ++ maybeToList rightArgToTableRelation
+          selectRelations ++ deleteRelations
       where
-        rightArgToTableRelation :: Maybe TableRelation
-        rightArgToTableRelation =
-          let rightArg = view rarg joinExpression
-              rightRangeVar = view rangeVar rightArg
-              joinTableAlias = rangeVarToTableAlias rightRangeVar
-              mJoinInfo = toJoinInformation joinTableAlias (view jointype joinExpression)
-           in JoinTable <$> mJoinInfo
+        getRelationsFromSelect :: SelectStmt -> [TableRelation]
+        getRelationsFromSelect selectStatement =
+          -- We only care about the first `from` clause.
+          let selectFromClause = head <$> nonEmpty (view fromClause selectStatement)
+           in maybe [] selectTableRelations selectFromClause
+          where
+            selectTableRelations :: Node -> [TableRelation]
+            selectTableRelations fromClauseNode =
+              case view maybe'joinExpr fromClauseNode of
+                Nothing ->
+                  let tableAlias = rangeVarToTableAlias $ view rangeVar fromClauseNode
+                   in [BaseTable tableAlias]
+                Just joinExpression ->
+                  joinExpressionToTableRelations joinExpression
+
+            joinExpressionToTableRelations :: JoinExpr -> [TableRelation]
+            joinExpressionToTableRelations joinExpression =
+              let leftArg = view larg joinExpression
+               in case view maybe'joinExpr leftArg of
+                    Nothing ->
+                      let leftRangeVar = view rangeVar leftArg
+                          baseTableAlias = rangeVarToTableAlias leftRangeVar
+                          joinTable = maybeToList rightArgToTableRelation
+                       in BaseTable baseTableAlias : joinTable
+                    Just join ->
+                      joinExpressionToTableRelations join
+                        ++ maybeToList rightArgToTableRelation
+              where
+                rightArgToTableRelation :: Maybe TableRelation
+                rightArgToTableRelation =
+                  let rightArg = view rarg joinExpression
+                      rightRangeVar = view rangeVar rightArg
+                      joinTableAlias = rangeVarToTableAlias rightRangeVar
+                      mJoinInfo = toJoinInformation (view jointype joinExpression) joinTableAlias
+                   in JoinTable <$> mJoinInfo
+
+        getRelationsFromDelete :: DeleteStmt -> [TableRelation]
+        getRelationsFromDelete deleteStatement =
+          let relationRangeVar = view relation deleteStatement
+              baseTable = BaseTable $ rangeVarToTableAlias relationRangeVar
+
+              usingClauses = view usingClause deleteStatement
+              joinTables = concatMap (catMaybes . usingClauseToTableRelations) usingClauses
+           in baseTable : joinTables
+          where
+            usingClauseToTableRelations :: Node -> [Maybe TableRelation]
+            usingClauseToTableRelations clause =
+              case view maybe'joinExpr clause of
+                Nothing ->
+                  [ JoinTable
+                      <$> toJoinInformation
+                        JOIN_INNER
+                        (rangeVarToTableAlias $ view rangeVar clause)
+                  ]
+                Just joinExpression ->
+                  Just <$> joinExpressionToTableRelations joinExpression
+
+            joinExpressionToTableRelations :: JoinExpr -> [TableRelation]
+            joinExpressionToTableRelations joinExpression =
+              let leftArg = view larg joinExpression
+               in case view maybe'joinExpr leftArg of
+                    Nothing ->
+                      let leftTable =
+                            JoinTable
+                              <$> toJoinInformation
+                                JOIN_INNER
+                                (rangeVarToTableAlias $ view rangeVar leftArg)
+                       in catMaybes [leftTable, rightArgToTableRelation]
+                    Just join ->
+                      joinExpressionToTableRelations join
+                        ++ maybeToList rightArgToTableRelation
+              where
+                rightArgToTableRelation :: Maybe TableRelation
+                rightArgToTableRelation =
+                  let rightArg = view rarg joinExpression
+                      rightRangeVar = view rangeVar rightArg
+                      joinTableAlias = rangeVarToTableAlias rightRangeVar
+                      mJoinInfo = toJoinInformation (view jointype joinExpression) joinTableAlias
+                   in JoinTable <$> mJoinInfo
 
     rangeVarToTableAlias :: RangeVar -> TableAndAlias
     rangeVarToTableAlias rVar =
@@ -300,8 +350,8 @@ parseTableRelations result =
             , alias
             }
 
-    toJoinInformation :: TableAndAlias -> JoinType -> Maybe JoinInformation
-    toJoinInformation tableAndAlias jType =
+    toJoinInformation :: JoinType -> TableAndAlias -> Maybe JoinInformation
+    toJoinInformation jType tableAndAlias =
       case joinTypeToPostgresqlJoinType jType of
         Nothing ->
           Nothing
@@ -325,3 +375,29 @@ parseTableRelations result =
       JOIN_UNIQUE_OUTER -> Nothing
       JOIN_TYPE_UNDEFINED -> Nothing
       JoinType'Unrecognized _unrecognized -> Nothing
+
+-- TODO: Handle Update: https://stackoverflow.com/a/32386537
+--
+-- update users u set name = n.full_name from nicknames n where n.user_id = u.id
+-- {version: 160001 stmts { stmt
+--   { update_stmt {
+--     relation {
+--       relname: "users" inh: true relpersistence: "p" alias { aliasname: "u" } location: 7
+--     }
+--     target_list { res_target { name: "name" val { column_ref { fields { string { sval: "n" } } fields { string { sval: "full_name" } } location: 26 } } location: 19 } }
+--     where_clause {
+--       a_expr {
+--         kind: AEXPR_OP
+--         name { string { sval: "=" } }
+--         lexpr { column_ref { fields { string { sval: "n" } } fields { string { sval: "user_id" } } location: 61 } }
+--         rexpr { column_ref { fields { string { sval: "u" } } fields { string { sval: "id" } } location: 73 } } location: 71 } }
+--     from_clause {
+--       range_var {
+--         relname: "nicknames"
+--         inh: true
+--         relpersistence: "p"
+--         alias { aliasname: "n" }
+--         location: 43
+--      }
+--    }
+--    } } }}

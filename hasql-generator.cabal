@@ -19,6 +19,8 @@ library
       Hasql.Generator.Internal.Database.Sql.Analysis
       Hasql.Generator.Internal.Database.Sql.Parser
       Hasql.Generator.Internal.Database.Sql.Parser.Types
+      Hasql.Generator.Internal.Database.Sql.Parser2
+      Hasql.Generator.Internal.Database.Sql.Parser2.Types
       Hasql.Generator.Internal.Database.Sql.PreparedStatement
       Hasql.Generator.Internal.Database.Sql.Types
       Hasql.Generator.Internal.Database.Statement
@@ -95,6 +97,7 @@ test-suite hasql-generator-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Hasql.Generator.Internal.Database.Sql.Parser2Spec
       Hasql.Generator.Internal.Database.Sql.ParserSpec
       Hasql.Generator.Internal.DatabaseSpec
       Hasql.Generator.Internal.RendererSpec

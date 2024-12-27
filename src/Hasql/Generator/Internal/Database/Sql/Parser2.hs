@@ -6,7 +6,7 @@ module Hasql.Generator.Internal.Database.Sql.Parser2
   )
 where
 
-import Control.Lens (preview, toListOf, traverse, view)
+import Control.Lens (toListOf, traverse, view)
 import Control.Monad ((=<<))
 import Data.Bool (Bool (False, True))
 import Data.Foldable (concatMap)
@@ -15,7 +15,14 @@ import Data.Functor (fmap, (<$>))
 import Data.Int (Int)
 import Data.List (null, (++))
 import Data.List.NonEmpty (head, nonEmpty)
-import Data.Maybe (Maybe (Just, Nothing), catMaybes, listToMaybe, mapMaybe, maybe, maybeToList)
+import Data.Maybe
+  ( Maybe (Just, Nothing),
+    catMaybes,
+    listToMaybe,
+    mapMaybe,
+    maybe,
+    maybeToList,
+  )
 import Data.Monoid ((<>))
 import Data.Text (Text, intercalate)
 import GHC.Real (fromIntegral)
@@ -75,7 +82,6 @@ import PgQuery
     joinExpr,
     jointype,
     larg,
-    lexpr,
     limitCount,
     maybe'aConst,
     maybe'alias,
@@ -84,8 +90,10 @@ import PgQuery
     maybe'insertStmt,
     maybe'ival,
     maybe'joinExpr,
+    maybe'lexpr,
     maybe'node,
     maybe'paramRef,
+    maybe'rexpr,
     maybe'selectStmt,
     maybe'string,
     maybe'updateStmt,
@@ -99,7 +107,6 @@ import PgQuery
     relname,
     resTarget,
     returningList,
-    rexpr,
     selectStmt,
     stmt,
     stmts,
@@ -174,7 +181,7 @@ parseParameters result =
 
     aExprToParameters :: A_Expr -> [Parameter]
     aExprToParameters aExpression =
-      case (preview lexpr aExpression, preview rexpr aExpression) of
+      case (view maybe'lexpr aExpression, view maybe'rexpr aExpression) of
         (Just leftNode, Just rightNode) ->
           case (view maybe'node leftNode, view maybe'node rightNode) of
             (Just (Node'ColumnRef columnRef), Just (Node'ParamRef paramRef)) ->
@@ -185,10 +192,6 @@ parseParameters result =
               fmap (toParameter columnRef) $ listToParamRefs list
             (Just (Node'List list), Just (Node'ColumnRef columnRef)) ->
               fmap (toParameter columnRef) $ listToParamRefs list
-            (_, Just (Node'SubLink subLink)) ->
-              nodesToParameters $ toListOf subselect subLink
-            (Just (Node'SubLink subLink), _) ->
-              nodesToParameters $ toListOf subselect subLink
             _ ->
               []
         _ ->

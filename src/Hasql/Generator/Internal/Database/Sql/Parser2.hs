@@ -128,32 +128,30 @@ parseParameters result =
     nodesToParameters :: [Node] -> [Parameter]
     nodesToParameters [] = []
     nodesToParameters statements =
-      let selectStatements = toListOf (traverse . selectStmt) statements
+      let selectStatements = fmap (view selectStmt) statements
           selectFromClauses = view (traverse . fromClause) selectStatements
-          selectWhereClauses = toListOf (traverse . whereClause) selectStatements
+          selectWhereClauses = fmap (view whereClause) selectStatements
 
-          updateStatements = toListOf (traverse . updateStmt) statements
+          updateStatements = fmap (view updateStmt) statements
           updateTargetList = view (traverse . targetList) updateStatements
           updateFromClauses = view (traverse . fromClause) updateStatements
-          updateWhereClauses = toListOf (traverse . whereClause) updateStatements
+          updateWhereClauses = fmap (view whereClause) updateStatements
 
-          deleteStatements = toListOf (traverse . deleteStmt) statements
+          deleteStatements = fmap (view deleteStmt) statements
           deleteUsingClauses = view (traverse . usingClause) deleteStatements
-          deleteWhereClauses = toListOf (traverse . whereClause) deleteStatements
+          deleteWhereClauses = fmap (view whereClause) deleteStatements
 
-          insertStatements = toListOf (traverse . insertStmt) statements
-          insertSelectStatements = toListOf (traverse . selectStmt . selectStmt) insertStatements
+          insertStatements = fmap (view insertStmt) statements
+          insertSelectStatements = fmap (view (selectStmt . selectStmt)) insertStatements
           insertSelectFromClauses = view (traverse . fromClause) insertSelectStatements
-          insertSelectWhereClauses = toListOf (traverse . whereClause) insertSelectStatements
+          insertSelectWhereClauses = fmap (view whereClause) insertSelectStatements
 
-          -- TODO: Other target lists?
-          targetLists = updateTargetList
           joinClauses =
-            toListOf
-              (traverse . joinExpr . quals)
+            fmap
+              (view (joinExpr . quals))
               (selectFromClauses ++ updateFromClauses ++ deleteUsingClauses ++ insertSelectFromClauses)
           whereClauses = selectWhereClauses ++ updateWhereClauses ++ deleteWhereClauses ++ insertSelectWhereClauses
-       in concatMap nodeToParameters (targetLists ++ joinClauses ++ whereClauses)
+       in concatMap nodeToParameters (updateTargetList ++ joinClauses ++ whereClauses)
 
     nodeToParameters :: Node -> [Parameter]
     nodeToParameters subNode =

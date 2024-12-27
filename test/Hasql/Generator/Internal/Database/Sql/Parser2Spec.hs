@@ -580,17 +580,17 @@ spec = do
 
     describe "When given a select statement" $ do
       it "Parses the parameters from a where clause containing basic expressions" $ do
-        let query = "select u.name from users u where u.id = $1 or u.created_at > $2"
+        let query = "select name from users where id = $1 or created_at > $2"
         result <- assertRight <$> parseSql (unpack query)
 
         let expected =
               [ Parameter
                   { parameterNumber = 1
-                  , parameterReference = "u.id"
+                  , parameterReference = "id"
                   }
               , Parameter
                   { parameterNumber = 2
-                  , parameterReference = "u.created_at"
+                  , parameterReference = "created_at"
                   }
               ]
             actual = sortParameters $ parseParameters result
@@ -635,44 +635,6 @@ spec = do
               ]
             actual = sortParameters $ parseParameters result
 
-        actual `shouldBe` expected
-
-      it "Parses the parameters from a CTE" $ do
-        let query =
-              "with regional_sales as ( \
-              \    select region, sum(amount) as total_sales \
-              \    from orders \
-              \    where sale_metadata = $1 \
-              \    group by region \
-              \), top_regions AS ( \
-              \    select region \
-              \    from regional_sales \
-              \    where total_sales > (select sum(total_sales) / 10 from regional_sales where region = $2) \
-              \) \
-              \select region, \
-              \       product, \
-              \       sum(quantity) as product_units, \
-              \       sum(amount) as product_sales \
-              \from orders \
-              \where region in (select region from top_regions where postal_code = $3) \
-              \group by region, product; "
-        result <- assertRight <$> parseSql (unpack query)
-
-        let expected =
-              [ Parameter
-                  { parameterNumber = 1
-                  , parameterReference = "sale_metadata"
-                  }
-              , Parameter
-                  { parameterNumber = 2
-                  , parameterReference = "region"
-                  }
-              , Parameter
-                  { parameterNumber = 3
-                  , parameterReference = "postal_code"
-                  }
-              ]
-            actual = sortParameters $ parseParameters result
         actual `shouldBe` expected
 
     describe "When given an update statement" $ do

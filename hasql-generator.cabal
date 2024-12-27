@@ -17,6 +17,8 @@ library
       Hasql.Generator.Internal.Database
       Hasql.Generator.Internal.Database.Sql
       Hasql.Generator.Internal.Database.Sql.Analysis
+      Hasql.Generator.Internal.Database.Sql.Analysis2
+      Hasql.Generator.Internal.Database.Sql.Analysis2.Types
       Hasql.Generator.Internal.Database.Sql.Parser
       Hasql.Generator.Internal.Database.Sql.Parser.Types
       Hasql.Generator.Internal.Database.Sql.Parser2

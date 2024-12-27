@@ -6,7 +6,7 @@ module Hasql.Generator.Internal.Database.Sql.Parser2
 where
 
 import Control.Lens (preview, toListOf, traverse, view)
-import Control.Monad ((=<<), (>>=))
+import Control.Monad ((=<<))
 import Data.Bool (Bool (False, True))
 import Data.Foldable (concatMap)
 import Data.Function (($), (.))
@@ -308,43 +308,8 @@ parseTableRelations result =
               baseTable = BaseTable $ rangeVarToTableAlias relationRangeVar
 
               usingClauses = view usingClause deleteStatement
-              joinTables = concatMap (catMaybes . usingClauseToTableRelations) usingClauses
+              joinTables = concatMap (catMaybes . clauseToTableRelations) usingClauses
            in baseTable : joinTables
-          where
-            usingClauseToTableRelations :: Node -> [Maybe TableRelation]
-            usingClauseToTableRelations clause =
-              case view maybe'joinExpr clause of
-                Nothing ->
-                  [ JoinTable
-                      <$> toJoinInformation
-                        JOIN_INNER
-                        (rangeVarToTableAlias $ view rangeVar clause)
-                  ]
-                Just joinExpression ->
-                  Just <$> joinExpressionToTableRelations joinExpression
-
-            joinExpressionToTableRelations :: JoinExpr -> [TableRelation]
-            joinExpressionToTableRelations joinExpression =
-              let leftArg = view larg joinExpression
-               in case view maybe'joinExpr leftArg of
-                    Nothing ->
-                      let leftTable =
-                            JoinTable
-                              <$> toJoinInformation
-                                JOIN_INNER
-                                (rangeVarToTableAlias $ view rangeVar leftArg)
-                       in catMaybes [leftTable, rightArgToTableRelation]
-                    Just join ->
-                      joinExpressionToTableRelations join
-                        ++ maybeToList rightArgToTableRelation
-              where
-                rightArgToTableRelation :: Maybe TableRelation
-                rightArgToTableRelation =
-                  let rightArg = view rarg joinExpression
-                      rightRangeVar = view rangeVar rightArg
-                      joinTableAlias = rangeVarToTableAlias rightRangeVar
-                      mJoinInfo = toJoinInformation (view jointype joinExpression) joinTableAlias
-                   in JoinTable <$> mJoinInfo
 
         getRelationsFromUpdate :: UpdateStmt -> [TableRelation]
         getRelationsFromUpdate updateStatement =
@@ -352,45 +317,8 @@ parseTableRelations result =
               baseTable = BaseTable $ rangeVarToTableAlias relationRangeVar
 
               fromClauses = view fromClause updateStatement
-              joinTables = concatMap (catMaybes . usingClauseToTableRelations) fromClauses
+              joinTables = concatMap (catMaybes . clauseToTableRelations) fromClauses
            in baseTable : joinTables
-          where
-            usingClauseToTableRelations :: Node -> [Maybe TableRelation]
-            usingClauseToTableRelations clause =
-              case view maybe'joinExpr clause of
-                Nothing ->
-                  [ JoinTable
-                      <$> toJoinInformation
-                        JOIN_INNER
-                        (rangeVarToTableAlias $ view rangeVar clause)
-                  ]
-                Just joinExpression ->
-                  Just <$> joinExpressionToTableRelations joinExpression
-
-            -- TODO: If this ends up being the same as above, we should figure
-            -- out how to consolidate
-            joinExpressionToTableRelations :: JoinExpr -> [TableRelation]
-            joinExpressionToTableRelations joinExpression =
-              let leftArg = view larg joinExpression
-               in case view maybe'joinExpr leftArg of
-                    Nothing ->
-                      let leftTable =
-                            JoinTable
-                              <$> toJoinInformation
-                                JOIN_INNER
-                                (rangeVarToTableAlias $ view rangeVar leftArg)
-                       in catMaybes [leftTable, rightArgToTableRelation]
-                    Just join ->
-                      joinExpressionToTableRelations join
-                        ++ maybeToList rightArgToTableRelation
-              where
-                rightArgToTableRelation :: Maybe TableRelation
-                rightArgToTableRelation =
-                  let rightArg = view rarg joinExpression
-                      rightRangeVar = view rangeVar rightArg
-                      joinTableAlias = rangeVarToTableAlias rightRangeVar
-                      mJoinInfo = toJoinInformation (view jointype joinExpression) joinTableAlias
-                   in JoinTable <$> mJoinInfo
 
         getRelationsFromInsert :: InsertStmt -> [TableRelation]
         getRelationsFromInsert insertStatement =
@@ -404,43 +332,43 @@ parseTableRelations result =
               -- We only care about the first `from` clause.
               mSelectFromClause = head <$> mSelectFromClauses
 
-              joinTables = catMaybes $ maybe [] fromClauseToTableRelations mSelectFromClause
+              joinTables = catMaybes $ maybe [] clauseToTableRelations mSelectFromClause
            in baseTable : joinTables
-          where
-            fromClauseToTableRelations :: Node -> [Maybe TableRelation]
-            fromClauseToTableRelations clause =
-              case view maybe'joinExpr clause of
-                Nothing ->
-                  [ JoinTable
-                      <$> toJoinInformation
-                        JOIN_INNER
-                        (rangeVarToTableAlias $ view rangeVar clause)
-                  ]
-                Just joinExpression ->
-                  Just <$> joinExpressionToTableRelations joinExpression
 
-            joinExpressionToTableRelations :: JoinExpr -> [TableRelation]
-            joinExpressionToTableRelations joinExpression =
-              let leftArg = view larg joinExpression
-               in case view maybe'joinExpr leftArg of
-                    Nothing ->
-                      let leftTable =
-                            JoinTable
-                              <$> toJoinInformation
-                                JOIN_INNER
-                                (rangeVarToTableAlias $ view rangeVar leftArg)
-                       in catMaybes [leftTable, rightArgToTableRelation]
-                    Just join ->
-                      joinExpressionToTableRelations join
-                        ++ maybeToList rightArgToTableRelation
-              where
-                rightArgToTableRelation :: Maybe TableRelation
-                rightArgToTableRelation =
-                  let rightArg = view rarg joinExpression
-                      rightRangeVar = view rangeVar rightArg
-                      joinTableAlias = rangeVarToTableAlias rightRangeVar
-                      mJoinInfo = toJoinInformation (view jointype joinExpression) joinTableAlias
-                   in JoinTable <$> mJoinInfo
+    clauseToTableRelations :: Node -> [Maybe TableRelation]
+    clauseToTableRelations clause =
+      case view maybe'joinExpr clause of
+        Nothing ->
+          [ JoinTable
+              <$> toJoinInformation
+                JOIN_INNER
+                (rangeVarToTableAlias $ view rangeVar clause)
+          ]
+        Just joinExpression ->
+          Just <$> joinExpressionToTableRelations joinExpression
+      where
+        joinExpressionToTableRelations :: JoinExpr -> [TableRelation]
+        joinExpressionToTableRelations joinExpression =
+          let leftArg = view larg joinExpression
+           in case view maybe'joinExpr leftArg of
+                Nothing ->
+                  let leftTable =
+                        JoinTable
+                          <$> toJoinInformation
+                            JOIN_INNER
+                            (rangeVarToTableAlias $ view rangeVar leftArg)
+                   in catMaybes [leftTable, rightArgToTableRelation]
+                Just join ->
+                  joinExpressionToTableRelations join
+                    ++ maybeToList rightArgToTableRelation
+          where
+            rightArgToTableRelation :: Maybe TableRelation
+            rightArgToTableRelation =
+              let rightArg = view rarg joinExpression
+                  rightRangeVar = view rangeVar rightArg
+                  joinTableAlias = rangeVarToTableAlias rightRangeVar
+                  mJoinInfo = toJoinInformation (view jointype joinExpression) joinTableAlias
+               in JoinTable <$> mJoinInfo
 
     rangeVarToTableAlias :: RangeVar -> TableAndAlias
     rangeVarToTableAlias rVar =

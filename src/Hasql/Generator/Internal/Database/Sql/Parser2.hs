@@ -6,7 +6,7 @@ module Hasql.Generator.Internal.Database.Sql.Parser2
 where
 
 import Control.Lens (preview, toListOf, traverse, view)
-import Control.Monad ((=<<))
+import Control.Monad ((=<<), (>>=))
 import Data.Bool (Bool (False, True))
 import Data.Foldable (concatMap)
 import Data.Function (($), (.))
@@ -29,6 +29,7 @@ import PgQuery
   ( A_Expr,
     ColumnRef,
     DeleteStmt,
+    InsertStmt,
     JoinExpr,
     JoinType
       ( JOIN_ANTI,
@@ -50,7 +51,6 @@ import PgQuery
         Node'AExpr,
         Node'BoolExpr,
         Node'ColumnRef,
-        Node'CommonTableExpr,
         Node'List,
         Node'ParamRef,
         Node'ResTarget,
@@ -65,8 +65,6 @@ import PgQuery
     UpdateStmt,
     aliasname,
     args,
-    ctequery,
-    ctes,
     deleteStmt,
     fields,
     fromClause,
@@ -81,6 +79,7 @@ import PgQuery
     limitCount,
     maybe'alias,
     maybe'deleteStmt,
+    maybe'insertStmt,
     maybe'ival,
     maybe'joinExpr,
     maybe'node,
@@ -104,7 +103,6 @@ import PgQuery
     updateStmt,
     usingClause,
     whereClause,
-    withClause,
   )
 
 parseLimit ::
@@ -263,8 +261,10 @@ parseTableRelations result =
 
           mUpdateStatement = view maybe'updateStmt statement
           updateRelations = maybe [] getRelationsFromUpdate mUpdateStatement
-       in -- TODO: Other types of queries
-          selectRelations ++ deleteRelations ++ updateRelations
+
+          mInsertStatement = view maybe'insertStmt statement
+          insertRelations = maybe [] getRelationsFromInsert mInsertStatement
+       in selectRelations ++ deleteRelations ++ updateRelations ++ insertRelations
       where
         getRelationsFromSelect :: SelectStmt -> [TableRelation]
         getRelationsFromSelect selectStatement =
@@ -369,6 +369,56 @@ parseTableRelations result =
 
             -- TODO: If this ends up being the same as above, we should figure
             -- out how to consolidate
+            joinExpressionToTableRelations :: JoinExpr -> [TableRelation]
+            joinExpressionToTableRelations joinExpression =
+              let leftArg = view larg joinExpression
+               in case view maybe'joinExpr leftArg of
+                    Nothing ->
+                      let leftTable =
+                            JoinTable
+                              <$> toJoinInformation
+                                JOIN_INNER
+                                (rangeVarToTableAlias $ view rangeVar leftArg)
+                       in catMaybes [leftTable, rightArgToTableRelation]
+                    Just join ->
+                      joinExpressionToTableRelations join
+                        ++ maybeToList rightArgToTableRelation
+              where
+                rightArgToTableRelation :: Maybe TableRelation
+                rightArgToTableRelation =
+                  let rightArg = view rarg joinExpression
+                      rightRangeVar = view rangeVar rightArg
+                      joinTableAlias = rangeVarToTableAlias rightRangeVar
+                      mJoinInfo = toJoinInformation (view jointype joinExpression) joinTableAlias
+                   in JoinTable <$> mJoinInfo
+
+        getRelationsFromInsert :: InsertStmt -> [TableRelation]
+        getRelationsFromInsert insertStatement =
+          let relationRangeVar = view relation insertStatement
+              baseTable = BaseTable $ rangeVarToTableAlias relationRangeVar
+
+              mSelectFromClauses =
+                nonEmpty . view fromClause
+                  =<< view maybe'selectStmt
+                  =<< view maybe'selectStmt insertStatement
+              -- We only care about the first `from` clause.
+              mSelectFromClause = head <$> mSelectFromClauses
+
+              joinTables = catMaybes $ maybe [] fromClauseToTableRelations mSelectFromClause
+           in baseTable : joinTables
+          where
+            fromClauseToTableRelations :: Node -> [Maybe TableRelation]
+            fromClauseToTableRelations clause =
+              case view maybe'joinExpr clause of
+                Nothing ->
+                  [ JoinTable
+                      <$> toJoinInformation
+                        JOIN_INNER
+                        (rangeVarToTableAlias $ view rangeVar clause)
+                  ]
+                Just joinExpression ->
+                  Just <$> joinExpressionToTableRelations joinExpression
+
             joinExpressionToTableRelations :: JoinExpr -> [TableRelation]
             joinExpressionToTableRelations joinExpression =
               let leftArg = view larg joinExpression

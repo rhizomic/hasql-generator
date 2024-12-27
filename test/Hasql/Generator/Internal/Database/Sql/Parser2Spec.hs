@@ -487,6 +487,59 @@ spec = do
 
         actual `shouldBe` expected
 
+    describe "When given an insert statement" $ do
+      it "returns the correct results for a query that has no joins" $ do
+        let query = "insert into users (email, name) values ($1, $2) returning id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that uses JOINs" $ do
+        let query =
+              "insert into users (email, name) \
+              \select u.email, n.full_name \
+              \from users u left join nicknames n \
+              \on u.id = n.user_id and n.id is not null"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseTableRelations result
+            expected =
+              [ BaseTable $
+                  TableAndAlias
+                    { table = "users"
+                    , alias = Nothing
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "users"
+                          , alias = Just "u"
+                          }
+                    , joinType = InnerJoin
+                    }
+              , JoinTable $
+                  JoinInformation
+                    { tableAndAlias =
+                        TableAndAlias
+                          { table = "nicknames"
+                          , alias = Just "n"
+                          }
+                    , joinType = LeftJoin
+                    }
+              ]
+
+        actual `shouldBe` expected
+
   describe "parseLimit" do
     it "returns the correct results for a query that has no specified limit" $ do
       let query = "select * from users"

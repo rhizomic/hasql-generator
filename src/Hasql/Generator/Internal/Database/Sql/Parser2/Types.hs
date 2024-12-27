@@ -6,6 +6,7 @@ module Hasql.Generator.Internal.Database.Sql.Parser2.Types
     JoinInformation (..),
     TableRelation (..),
     Parameter (..),
+    Result (..),
   )
 where
 
@@ -56,3 +57,6 @@ data Parameter = Parameter
   , parameterReference :: Text
   }
   deriving stock (Show, Eq)
+
+newtype Result = Result Text
+  deriving newtype (Show, Eq)

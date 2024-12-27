@@ -9,11 +9,12 @@ import Data.List (sortBy)
 import Data.Maybe (Maybe (Just, Nothing))
 import Data.Ord (compare)
 import Data.Text (unpack)
-import Hasql.Generator.Internal.Database.Sql.Parser2 (parseLimit, parseParameters, parseTableRelations)
+import Hasql.Generator.Internal.Database.Sql.Parser2 (parseLimit, parseParameters, parseResults, parseTableRelations)
 import Hasql.Generator.Internal.Database.Sql.Parser2.Types
   ( JoinInformation (JoinInformation, joinType, tableAndAlias),
     Parameter (Parameter, parameterNumber, parameterReference),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin),
+    Result (Result),
     TableAndAlias (TableAndAlias, alias, table),
     TableRelation (BaseTable, JoinTable),
   )
@@ -503,7 +504,7 @@ spec = do
 
         actual `shouldBe` expected
 
-      it "returns the correct results for a query that uses JOINs" $ do
+      it "returns the correct results for a query that uses joins" $ do
         let query =
               "insert into users (email, name) \
               \select u.email, n.full_name \
@@ -744,6 +745,190 @@ spec = do
               ]
             actual = sortParameters $ parseParameters result
 
+        actual `shouldBe` expected
+
+  describe "parseResults" $ do
+    describe "When given a select statement" $ do
+      it "returns the correct results for a query that makes no use of aliases or joins" $ do
+        let query = "select id, name from users"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "id"
+              , Result "name"
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that makes use of aliases" $ do
+        let query = "select u.id, u.name from users u"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "u.id"
+              , Result "u.name"
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that uses joins" $ do
+        let query =
+              "select id, full_name \
+              \from users \
+              \join nicknames on users.id = nicknames.user_id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "id"
+              , Result "full_name"
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that uses aliases and joins" $ do
+        let query =
+              "select u.id, n.full_name \
+              \from users u \
+              \join nicknames n on u.id = n.user_id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "u.id"
+              , Result "n.full_name"
+              ]
+
+        actual `shouldBe` expected
+
+    describe "When given a delete statement" $ do
+      it "returns the correct results for a query that doesn't return anything" $ do
+        let query = "delete from users"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected = []
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that makes no use of aliases or joins" $ do
+        let query = "delete from users returning id, email"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "id"
+              , Result "email"
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that joins via USING and regular JOINs" $ do
+        let query =
+              "delete from users \
+              \using users u \
+              \join addresses a on a.user_id = u.id \
+              \left outer join nicknames n on u.name = n.full_name \
+              \where a.postal_code = $1 \
+              \and n.last_name = $2 \
+              \returning u.id, a.postal_code, n.first_name"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "u.id"
+              , Result "a.postal_code"
+              , Result "n.first_name"
+              ]
+
+        actual `shouldBe` expected
+
+    describe "When given an update statement" $ do
+      it "returns the correct results for a query that doesn't return anything" $ do
+        let query = "update users set name = $1"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected = []
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that makes no use of aliases or joins" $ do
+        let query = "update users set name = $1 returning id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "id"
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that joins via FROM" $ do
+        let query =
+              "update users u \
+              \set name = n.full_name \
+              \from nicknames n \
+              \where n.user_id = u.id \
+              \returning u.id, u.name"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "u.id"
+              , Result "u.name"
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that joins via FROM and regular JOINs" $ do
+        let query =
+              "update users u \
+              \set name = n.full_name \
+              \from nicknames n \
+              \left join addresses a on n.user_id = a.user_id \
+              \where n.user_id = u.id \
+              \returning u.id, u.name, u.created_at"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "u.id"
+              , Result "u.name"
+              , Result "u.created_at"
+              ]
+
+        actual `shouldBe` expected
+
+    describe "When given an insert statement" $ do
+      it "returns the correct results for a query that has no joins" $ do
+        let query = "insert into users (email, name) values ($1, $2) returning id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "id"
+              ]
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that uses joins" $ do
+        let query =
+              "insert into users (email, name) \
+              \select u.email, n.full_name \
+              \from users u left join nicknames n \
+              \on u.id = n.user_id and n.id is not null \
+              \returning id, email, name"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseResults result
+            expected =
+              [ Result "id"
+              , Result "email"
+              , Result "name"
+              ]
         actual `shouldBe` expected
 
 sortParameters :: [Parameter] -> [Parameter]

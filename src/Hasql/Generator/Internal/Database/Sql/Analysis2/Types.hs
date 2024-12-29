@@ -1,11 +1,13 @@
 module Hasql.Generator.Internal.Database.Sql.Analysis2.Types
   ( PostgresqlType (..),
     NullabilityConstraint (..),
+    TableName (..),
     ColumnMetadata (..),
   )
 where
 
 import Data.Eq (Eq)
+import Data.Ord (Ord)
 import Data.Text (Text)
 import GHC.Show (Show)
 
@@ -65,11 +67,13 @@ data NullabilityConstraint
     Null
   deriving stock (Show, Eq)
 
+-- | The name of a table.
+newtype TableName = TableName Text
+  deriving newtype (Show, Eq, Ord)
+
 -- | Metadata about a particular column in a table.
 data ColumnMetadata = ColumnMetadata
-  { tableName :: Text
-  -- ^ The table name.
-  , columnName :: Text
+  { columnName :: Text
   -- ^ The column name.
   , columnType :: PostgresqlType
   -- ^ The column type, as depicted by e.g., `\d TABLE` in `psql`.

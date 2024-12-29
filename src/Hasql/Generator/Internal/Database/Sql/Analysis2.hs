@@ -3,27 +3,27 @@ module Hasql.Generator.Internal.Database.Sql.Analysis2
   )
 where
 
-import Control.Applicative (pure, (<*>))
+import Control.Applicative ((<*>))
 import Data.Bool (Bool)
 import Data.ByteString (ByteString)
+import Data.Coerce (coerce)
+import Data.Foldable (foldl')
 import Data.Function (($))
 import Data.Functor (fmap, (<$>))
+import Data.Map.Strict (Map, fromListWith)
 import Data.Monoid ((<>))
 import Data.Text (Text)
-import Data.Vector (Vector)
-import Data.Vector qualified as Vector (toList)
-import Hasql.Decoders (Result, column, rowVector)
+import Hasql.Decoders (Result, column, rowList)
 import Hasql.Decoders qualified as Decoders (bool, nonNullable, text)
 import Hasql.Encoders (Params, param)
-import Hasql.Encoders qualified as Encoders (nonNullable, text)
+import Hasql.Encoders qualified as Encoders (Value, array, dimension, element, nonNullable, text)
 import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
   ( ColumnMetadata
       ( ColumnMetadata,
         columnName,
         columnNullConstraint,
         columnType,
-        columnUnderlyingType,
-        tableName
+        columnUnderlyingType
       ),
     NullabilityConstraint (NotNull, Null),
     PostgresqlType
@@ -49,59 +49,73 @@ import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
         PgUnknown,
         PgUuid
       ),
+    TableName (TableName),
   )
 import Hasql.Generator.Internal.Database.Transaction (transaction)
 import Hasql.Transaction (Transaction)
 
 -- | Retrieves the 'ColumnMetadata' for each of the columns in the supplied
---   table.
+--   tables.
 getColumnMetadata ::
-  Text ->
-  Transaction [ColumnMetadata]
-getColumnMetadata tableName = do
-  results <- transaction tableAndColumnsSql tableName encoder decoder
-  pure $ Vector.toList results
+  [TableName] ->
+  Transaction (Map TableName [ColumnMetadata])
+getColumnMetadata tableNames = do
+  transaction tableAndColumnsSql (fmap coerce tableNames) encoder decoder
   where
     -- Adapted from https://dba.stackexchange.com/a/75124
     tableAndColumnsSql :: ByteString
     tableAndColumnsSql =
       "select "
+        <> "  pgc.relname, "
         <> "  pga.attname, "
         <> "  format_type(pga.atttypid, pga.atttypmod) as column_type, "
         <> "  coalesce(format_type(pgt.typbasetype, pgt.typtypmod), format_type(pga.atttypid, pga.atttypmod)) as underlying_type, "
         <> "  pga.attnotnull "
         <> "from pg_attribute pga "
-        <> "left join pg_catalog.pg_type pgt "
+        <> "join pg_class pgc "
+        <> "  on pgc.oid = pga.attrelid "
+        <> "left join pg_type pgt "
         <> "  on pgt.typname = format_type(pga.atttypid, pga.atttypmod) "
         <> "  and pgt.typtype = 'd' "
         <> "  and pg_type_is_visible(pgt.oid) "
-        <> "where pga.attrelid = $1::regclass "
+        <> "where pgc.relname = any ($1) "
         <> "and pga.attnum > 0 "
         <> "and not pga.attisdropped;"
 
-    encoder :: Params Text
-    encoder = param $ Encoders.nonNullable Encoders.text
+    encoder :: Params [Text]
+    encoder =
+      let textElement = Encoders.element $ Encoders.nonNullable Encoders.text
+          oneDimensionTextArray :: Encoders.Value [Text] =
+            Encoders.array $ Encoders.dimension foldl' textElement
+       in param $ Encoders.nonNullable oneDimensionTextArray
 
-    decoder :: Result (Vector ColumnMetadata)
+    decoder :: Result (Map TableName [ColumnMetadata])
     decoder =
       let rows =
-            rowVector $
-              (,,,)
+            rowList $
+              (,,,,)
                 <$> column (Decoders.nonNullable Decoders.text)
                 <*> column (Decoders.nonNullable Decoders.text)
                 <*> column (Decoders.nonNullable Decoders.text)
+                <*> column (Decoders.nonNullable Decoders.text)
                 <*> column (Decoders.nonNullable Decoders.bool)
-       in fmap processRow <$> rows
+          processedRows = fmap processRow <$> rows
+       in fmap (fromListWith (<>)) processedRows
       where
-        processRow :: (Text, Text, Text, Bool) -> ColumnMetadata
-        processRow (columnName, rawColumnType, rawUnderlyingType, isNotNull) =
-          ColumnMetadata
-            { tableName = tableName
-            , columnName = columnName
-            , columnType = textToPostgresqlType rawColumnType
-            , columnUnderlyingType = textToPostgresqlType rawUnderlyingType
-            , columnNullConstraint = if isNotNull then NotNull else Null
-            }
+        processRow ::
+          (Text, Text, Text, Text, Bool) ->
+          (TableName, [ColumnMetadata])
+        processRow (tableName, columnName, rawColumnType, rawUnderlyingType, isNotNull) =
+          ( TableName tableName
+          ,
+            [ ColumnMetadata
+                { columnName = columnName
+                , columnType = textToPostgresqlType rawColumnType
+                , columnUnderlyingType = textToPostgresqlType rawUnderlyingType
+                , columnNullConstraint = if isNotNull then NotNull else Null
+                }
+            ]
+          )
 
 -- | Converts a text-based representation of a type within Postgres to a
 --   'PostgresqlType'.

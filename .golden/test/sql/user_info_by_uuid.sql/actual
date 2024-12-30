@@ -1,0 +1,44 @@
+module Query
+  (query)
+where
+
+import Control.Applicative ((<*>))
+import Data.Bool (Bool (True))
+import Data.ByteString (ByteString)
+import Data.Function (($))
+import Data.Functor ((<$>))
+import Data.Maybe (Maybe)
+import Data.Text (Text)
+import Data.UUID (UUID)
+import Data.Vector (Vector)
+import Hasql.Decoders qualified as Decoders
+import Hasql.Encoders qualified as Encoders
+import Hasql.Statement (Statement (Statement))
+import Hasql.Transaction (Transaction, statement)
+
+query ::
+  UUID ->
+  Transaction (Vector (Text, Text, Maybe Text))
+query a1 =
+  statement
+   params
+   (Statement sql encoder decoder True)
+
+  where
+    sql :: ByteString
+    sql = "select\n  u.name,\n  a.line_1,\n  n.nickname\nfrom\n  users u\nleft join nicknames n on u.id = n.user_id\njoin addresses a on u.id = a.user_id\n\nwhere u.id = $1;\n"
+
+    params :: UUID
+    params = a1
+
+    encoder :: Encoders.Params UUID
+    encoder =
+      Encoders.param $ Encoders.nonNullable Encoders.uuid
+
+    decoder :: Decoders.Result (Vector (Text, Text, Maybe Text))
+    decoder =
+      Decoders.rowVector $
+        (,,)
+          <$> Decoders.column (Decoders.nonNullable Decoders.text)
+          <*> Decoders.column (Decoders.nonNullable Decoders.text)
+          <*> Decoders.column (Decoders.nullable Decoders.text)

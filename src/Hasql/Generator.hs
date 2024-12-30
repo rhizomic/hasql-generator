@@ -13,17 +13,18 @@ import Data.Functor (fmap)
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 import Data.Maybe (Maybe (Just, Nothing), mapMaybe)
 import Data.Monoid ((<>))
-import Data.Text (Text, intercalate, pack)
+import Data.Text (Text, pack)
 import Data.Text.IO (writeFile)
 import Data.Traversable (traverse)
 import GHC.IO (IO)
 import GHC.Show (Show (show))
 import Hasql.Generator.Internal.Database (withDb)
-import Hasql.Generator.Internal.Database.Sql (parameterAndResultMetadata)
+import Hasql.Generator.Internal.Database.Sql.Analysis2 (getParameterAndResultMetadata)
 import Hasql.Generator.Internal.Database.Sql.Parser (parseLimit)
+import Hasql.Generator.Internal.Database.Sql.Parser2 (parseQueryParameters, parseQueryResults, parseTableRelations)
 import Hasql.Generator.Internal.Database.Transaction (runTransaction)
 import Hasql.Generator.Internal.Database.Types (DatabaseSettings (host))
-import Hasql.Generator.Internal.Renderer (renderingIssueToHuman, toHaskell)
+import Hasql.Generator.Internal.Renderer2 (toHaskell)
 import Hasql.Generator.Types
   ( QueryConfig
       ( functionName,
@@ -93,22 +94,24 @@ generate schemaFile queries = do
           pure $ Left (toError (pack $ show err), query)
         Right parseResult -> do
           let mLimit = parseLimit parseResult
+              mTableRelations = parseTableRelations parseResult
+              mQueryParameters = parseQueryParameters parseResult
+              mQueryResults = parseQueryResults parseResult
 
           eMetadata <-
             use pool . runTransaction $
-              parameterAndResultMetadata sql
+              getParameterAndResultMetadata
+                mTableRelations
+                mQueryParameters
+                mQueryResults
 
           case eMetadata of
             Left err ->
               pure $ Left (toError (pack $ show err), query)
-            Right metadata ->
-              case toHaskell sql metadata mLimit query.moduleName query.functionName of
-                Left renderingIssues ->
-                  let errors = intercalate "\n" $ fmap renderingIssueToHuman renderingIssues
-                   in pure $ Left (toError errors, query)
-                Right result -> do
-                  writeFile query.outputLocation result
-                  pure $ Right ()
+            Right metadata -> do
+              let result = toHaskell sql metadata mLimit query.moduleName query.functionName
+              writeFile query.outputLocation result
+              pure $ Right ()
       where
         toError :: Text -> Text
         toError err =

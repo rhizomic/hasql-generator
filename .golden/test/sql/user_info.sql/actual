@@ -10,7 +10,6 @@ import Data.Function (($))
 import Data.Functor ((<$>))
 import Data.Maybe (Maybe)
 import Data.Text (Text)
-import Data.UUID (UUID)
 import Data.Vector (Vector)
 import Hasql.Decoders qualified as Decoders
 import Hasql.Encoders qualified as Encoders
@@ -18,7 +17,7 @@ import Hasql.Statement (Statement (Statement))
 import Hasql.Transaction (Transaction, statement)
 
 query ::
-  UUID ->
+  Text ->
   Text ->
   Transaction (Vector (Text, Maybe Text, Text, Maybe Text, Text))
 query a1 a2 =
@@ -30,13 +29,13 @@ query a1 a2 =
     sql :: ByteString
     sql = "select\n  u.name,\n  n.nickname,\n  a.line_1,\n  a.line_2,\n  a.city\nfrom\n  users u\njoin addresses a on u.id = a.user_id\nleft join nicknames n on u.id = n.user_id\n\nwhere\n  u.name = $1\n  and a.postal_code = $2;\n"
 
-    params :: (UUID, Text)
+    params :: (Text, Text)
     params = (a1, a2)
 
-    encoder :: Encoders.Params (UUID, Text)
+    encoder :: Encoders.Params (Text, Text)
     encoder =
       contrazip2
-        (Encoders.param $ Encoders.nonNullable Encoders.uuid)
+        (Encoders.param $ Encoders.nonNullable Encoders.text)
         (Encoders.param $ Encoders.nonNullable Encoders.text)
 
     decoder :: Decoders.Result (Vector (Text, Maybe Text, Text, Maybe Text, Text))

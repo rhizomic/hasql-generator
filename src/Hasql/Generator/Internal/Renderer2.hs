@@ -20,7 +20,29 @@ import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
   ( ColumnMetadata (columnNullConstraint, columnType),
     NullabilityConstraint (NotNull, Null),
     PostgresqlParameterAndResultMetadata (parameterMetadata, resultMetadata),
-    PostgresqlType (PgBool, PgBytea, PgChar, PgDate, PgFloat4, PgFloat8, PgInet, PgInt2, PgInt4, PgInt8, PgInterval, PgJson, PgJsonb, PgNumeric, PgText, PgTime, PgTimestamp, PgTimestamptz, PgTimetz, PgUnknown, PgUuid),
+    PostgresqlType
+      ( PgBool,
+        PgBytea,
+        PgChar,
+        PgDate,
+        PgFloat4,
+        PgFloat8,
+        PgInet,
+        PgInt2,
+        PgInt4,
+        PgInt8,
+        PgInterval,
+        PgJson,
+        PgJsonb,
+        PgNumeric,
+        PgText,
+        PgTime,
+        PgTimestamp,
+        PgTimestamptz,
+        PgTimetz,
+        PgUnknown,
+        PgUuid
+      ),
   )
 
 toHaskell ::

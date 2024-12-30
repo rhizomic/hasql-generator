@@ -5,7 +5,12 @@ import Data.Function (($))
 import Data.Maybe (Maybe (Just, Nothing))
 import Data.String (String)
 import Data.Text (Text, unpack)
-import Hasql.Generator.Internal.Database.Sql.Analysis2.Types (ColumnMetadata (ColumnMetadata, columnNullConstraint, columnType), NullabilityConstraint (NotNull, Null), PostgresqlParameterAndResultMetadata (PostgresqlParameterAndResultMetadata, parameterMetadata, resultMetadata), PostgresqlType (PgText, PgUuid))
+import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
+  ( ColumnMetadata (ColumnMetadata, columnNullConstraint, columnType),
+    NullabilityConstraint (NotNull, Null),
+    PostgresqlParameterAndResultMetadata (PostgresqlParameterAndResultMetadata, parameterMetadata, resultMetadata),
+    PostgresqlType (PgText, PgUuid),
+  )
 import Hasql.Generator.Internal.Renderer2 (toHaskell)
 import Test.Hspec
   ( Spec,

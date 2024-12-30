@@ -58,6 +58,9 @@ import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
       ),
     TableName (TableName),
   )
+import Hasql.Generator.Internal.Database.Sql.Analysis2.Types qualified as ColumnReferenceMetadata
+  ( ColumnReferenceMetadata (columnNullConstraint),
+  )
 import Hasql.Generator.Internal.Database.Sql.Parser2.Types
   ( JoinInformation (joinType, tableAndAlias),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin, RightJoin),
@@ -193,7 +196,8 @@ getColumnReferenceMetadata tableRelations = do
         forceNullable ::
           ColumnReferenceMetadata ->
           ColumnReferenceMetadata
-        forceNullable metadata = metadata {columnNullConstraint = Null}
+        forceNullable metadata =
+          metadata {ColumnReferenceMetadata.columnNullConstraint = Null}
 
 -- | Retrieves the 'ColumnTypeInformation' for each of the columns in the
 --   supplied tables.

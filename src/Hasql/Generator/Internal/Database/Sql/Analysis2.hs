@@ -1,16 +1,19 @@
 module Hasql.Generator.Internal.Database.Sql.Analysis2
-  ( getColumnMetadata,
+  ( getParameterAndResultMetadata,
   )
 where
 
-import Control.Applicative ((<*>))
+import Control.Applicative (pure, (<*>))
 import Data.Bool (Bool)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Foldable (foldl')
-import Data.Function (($))
+import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
-import Data.Map.Strict (Map, fromListWith)
+import Data.List (concat, unsnoc, (++))
+import Data.List.NonEmpty (NonEmpty, fromList, toList)
+import Data.Map.Strict (Map, fromListWith, (!))
+import Data.Maybe (Maybe (Just, Nothing), maybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import Hasql.Decoders (Result, column, rowList)
@@ -18,8 +21,9 @@ import Hasql.Decoders qualified as Decoders (bool, nonNullable, text)
 import Hasql.Encoders (Params, param)
 import Hasql.Encoders qualified as Encoders (Value, array, dimension, element, nonNullable, text)
 import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
-  ( ColumnMetadata
-      ( ColumnMetadata,
+  ( ColumnMetadata (ColumnMetadata, columnNullConstraint, columnReferences, columnType),
+    ColumnTypeInformation
+      ( ColumnTypeInformation,
         columnName,
         columnNullConstraint,
         columnType,
@@ -51,15 +55,125 @@ import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
       ),
     TableName (TableName),
   )
+import Hasql.Generator.Internal.Database.Sql.Parser2.Types
+  ( JoinInformation (joinType, tableAndAlias),
+    PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin, RightJoin),
+    QueryParameter,
+    QueryResult,
+    TableAndAlias (alias, table),
+    TableRelation (BaseTable, JoinTable),
+  )
+import Hasql.Generator.Internal.Database.Sql.Types
+  ( PostgresqlParameterAndResultMetadata (PostgresqlParameterAndResultMetadata, parameterMetadata, resultMetadata),
+  )
 import Hasql.Generator.Internal.Database.Transaction (transaction)
 import Hasql.Transaction (Transaction)
 
--- | Retrieves the 'ColumnMetadata' for each of the columns in the supplied
---   tables.
-getColumnMetadata ::
+getParameterAndResultMetadata ::
+  Maybe (NonEmpty TableRelation) ->
+  Maybe (NonEmpty QueryParameter) ->
+  Maybe (NonEmpty QueryResult) ->
+  Transaction PostgresqlParameterAndResultMetadata
+getParameterAndResultMetadata mTableRelations parameters results = do
+  columnMetadata <- maybe (pure []) getColumnMetadata mTableRelations
+
+  pure
+    PostgresqlParameterAndResultMetadata
+      { parameterMetadata = []
+      , resultMetadata = []
+      }
+  where
+    getColumnMetadata ::
+      NonEmpty TableRelation ->
+      Transaction [ColumnMetadata]
+    getColumnMetadata tableRelations = do
+      let tableNames = toList $ fmap tableRelationToTableName tableRelations
+      allTypeInformation <- getColumnTypeInformation tableNames
+
+      let relationsWithMetadata =
+            fmap (toTableRelationAndColumnMetadata allTypeInformation) tableRelations
+          allMetadata = foldl' adjustNullability [] relationsWithMetadata
+      pure $ concat allMetadata
+      where
+        tableRelationToTableName :: TableRelation -> TableName
+        tableRelationToTableName =
+          TableName . \case
+            BaseTable tableAndAlias -> tableAndAlias.table
+            JoinTable joinInformation -> joinInformation.tableAndAlias.table
+
+        adjustNullability ::
+          [[ColumnMetadata]] ->
+          (TableRelation, [ColumnMetadata]) ->
+          [[ColumnMetadata]]
+        adjustNullability acc (relation, columnMetadata) =
+          case tableRelationToJoinType relation of
+            Nothing -> acc ++ [columnMetadata]
+            Just InnerJoin -> acc ++ [columnMetadata]
+            Just LeftJoin -> acc ++ [fmap forceNullable columnMetadata]
+            Just RightJoin -> fmap (fmap forceNullable) acc ++ [columnMetadata]
+            Just FullJoin ->
+              case unsnoc acc of
+                Nothing ->
+                  acc ++ [fmap forceNullable columnMetadata]
+                Just (initial, priorColumnMetadata) ->
+                  initial
+                    ++ [ fmap forceNullable priorColumnMetadata
+                       , fmap forceNullable columnMetadata
+                       ]
+          where
+            tableRelationToJoinType ::
+              TableRelation ->
+              Maybe PostgresqlJoinType
+            tableRelationToJoinType = \case
+              BaseTable _tableAndAlias -> Nothing
+              JoinTable joinInformation -> Just joinInformation.joinType
+
+            forceNullable ::
+              ColumnMetadata ->
+              ColumnMetadata
+            forceNullable metadata = metadata {columnNullConstraint = Null}
+
+        toTableRelationAndColumnMetadata ::
+          Map TableName [ColumnTypeInformation] ->
+          TableRelation ->
+          (TableRelation, [ColumnMetadata])
+        toTableRelationAndColumnMetadata allTypeInformation tableRelation =
+          let tableName = tableRelationToTableName tableRelation
+              -- TODO: Defend the use of `!` or use something like 'lookup' instead
+              tableTypeInformation = allTypeInformation ! tableName
+              columnMetadata = fmap toColumnMetadata tableTypeInformation
+           in (tableRelation, columnMetadata)
+          where
+            toColumnMetadata ::
+              ColumnTypeInformation ->
+              ColumnMetadata
+            toColumnMetadata typeInfo =
+              let tableAndAlias = case tableRelation of
+                    BaseTable t -> t
+                    JoinTable joinInformation -> joinInformation.tableAndAlias
+                  references = case tableAndAlias.alias of
+                    Nothing ->
+                      fromList
+                        [ tableAndAlias.table <> "." <> typeInfo.columnName
+                        , typeInfo.columnName
+                        ]
+                    Just alias ->
+                      fromList
+                        [ alias <> "." <> typeInfo.columnName
+                        , typeInfo.columnName
+                        ]
+               in ColumnMetadata
+                    { columnReferences = references
+                    , columnType = typeInfo.columnUnderlyingType
+                    , columnNullConstraint = typeInfo.columnNullConstraint
+                    }
+
+-- | Retrieves the 'ColumnTypeInformation' for each of the columns in the
+--   supplied tables.
+getColumnTypeInformation ::
   [TableName] ->
-  Transaction (Map TableName [ColumnMetadata])
-getColumnMetadata tableNames = do
+  Transaction (Map TableName [ColumnTypeInformation])
+getColumnTypeInformation tableNames = do
   transaction tableAndColumnsSql (fmap coerce tableNames) encoder decoder
   where
     -- Adapted from https://dba.stackexchange.com/a/75124
@@ -89,7 +203,7 @@ getColumnMetadata tableNames = do
             Encoders.array $ Encoders.dimension foldl' textElement
        in param $ Encoders.nonNullable oneDimensionTextArray
 
-    decoder :: Result (Map TableName [ColumnMetadata])
+    decoder :: Result (Map TableName [ColumnTypeInformation])
     decoder =
       let rows =
             rowList $
@@ -104,11 +218,11 @@ getColumnMetadata tableNames = do
       where
         processRow ::
           (Text, Text, Text, Text, Bool) ->
-          (TableName, [ColumnMetadata])
+          (TableName, [ColumnTypeInformation])
         processRow (tableName, columnName, rawColumnType, rawUnderlyingType, isNotNull) =
           ( TableName tableName
           ,
-            [ ColumnMetadata
+            [ ColumnTypeInformation
                 { columnName = columnName
                 , columnType = textToPostgresqlType rawColumnType
                 , columnUnderlyingType = textToPostgresqlType rawUnderlyingType

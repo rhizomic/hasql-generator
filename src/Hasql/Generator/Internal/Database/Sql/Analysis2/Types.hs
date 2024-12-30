@@ -2,11 +2,13 @@ module Hasql.Generator.Internal.Database.Sql.Analysis2.Types
   ( PostgresqlType (..),
     NullabilityConstraint (..),
     TableName (..),
+    ColumnTypeInformation (..),
     ColumnMetadata (..),
   )
 where
 
 import Data.Eq (Eq)
+import Data.List.NonEmpty (NonEmpty)
 import Data.Ord (Ord)
 import Data.Text (Text)
 import GHC.Show (Show)
@@ -72,7 +74,7 @@ newtype TableName = TableName Text
   deriving newtype (Show, Eq, Ord)
 
 -- | Metadata about a particular column in a table.
-data ColumnMetadata = ColumnMetadata
+data ColumnTypeInformation = ColumnTypeInformation
   { columnName :: Text
   -- ^ The column name.
   , columnType :: PostgresqlType
@@ -84,3 +86,10 @@ data ColumnMetadata = ColumnMetadata
   -- ^ The column nullability constraint.
   }
   deriving stock (Show, Eq)
+
+-- TODO: Docs
+data ColumnMetadata = ColumnMetadata
+  { columnReferences :: NonEmpty Text
+  , columnType :: PostgresqlType
+  , columnNullConstraint :: NullabilityConstraint
+  }

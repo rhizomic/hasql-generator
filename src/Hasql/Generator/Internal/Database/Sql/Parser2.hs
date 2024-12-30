@@ -13,7 +13,7 @@ import Data.Foldable (concatMap)
 import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
 import Data.Int (Int)
-import Data.List (null, (++))
+import Data.List (null, sort, (++))
 import Data.List.NonEmpty (NonEmpty, head, nonEmpty)
 import Data.Maybe
   ( Maybe (Just, Nothing),
@@ -135,7 +135,7 @@ parseQueryParameters ::
   Maybe (NonEmpty QueryParameter)
 parseQueryParameters result =
   let statements = toListOf (stmts . traverse . stmt) result
-   in nonEmpty $ nodesToParameters statements
+   in nonEmpty . sort $ nodesToParameters statements
   where
     nodesToParameters :: [Node] -> [QueryParameter]
     nodesToParameters [] = []

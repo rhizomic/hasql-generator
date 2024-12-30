@@ -7,21 +7,23 @@ import Control.Applicative (pure, (<*>))
 import Data.Bool (Bool)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
-import Data.Foldable (foldl')
+import Data.Foldable (elem, foldl')
 import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
-import Data.List (concat, unsnoc, (++))
+import Data.List (concat, filter, unsnoc, (++))
 import Data.List.NonEmpty (NonEmpty, fromList, toList)
 import Data.Map.Strict (Map, fromListWith, (!))
 import Data.Maybe (Maybe (Just, Nothing), maybe)
 import Data.Monoid ((<>))
-import Data.Text (Text)
+import Data.Text (Text, unpack)
+import GHC.Base (error)
 import Hasql.Decoders (Result, column, rowList)
 import Hasql.Decoders qualified as Decoders (bool, nonNullable, text)
 import Hasql.Encoders (Params, param)
 import Hasql.Encoders qualified as Encoders (Value, array, dimension, element, nonNullable, text)
 import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
-  ( ColumnMetadata (ColumnMetadata, columnNullConstraint, columnReferences, columnType),
+  ( ColumnMetadata (ColumnMetadata, columnNullConstraint, columnType),
+    ColumnReferenceMetadata (ColumnReferenceMetadata, columnNullConstraint, columnReferences, columnType),
     ColumnTypeInformation
       ( ColumnTypeInformation,
         columnName,
@@ -30,6 +32,7 @@ import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
         columnUnderlyingType
       ),
     NullabilityConstraint (NotNull, Null),
+    PostgresqlParameterAndResultMetadata (PostgresqlParameterAndResultMetadata, parameterMetadata, resultMetadata),
     PostgresqlType
       ( PgBool,
         PgBytea,
@@ -58,13 +61,10 @@ import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
 import Hasql.Generator.Internal.Database.Sql.Parser2.Types
   ( JoinInformation (joinType, tableAndAlias),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin, RightJoin),
-    QueryParameter,
-    QueryResult,
+    QueryParameter (parameterReference),
+    QueryResult (QueryResult),
     TableAndAlias (alias, table),
     TableRelation (BaseTable, JoinTable),
-  )
-import Hasql.Generator.Internal.Database.Sql.Types
-  ( PostgresqlParameterAndResultMetadata (PostgresqlParameterAndResultMetadata, parameterMetadata, resultMetadata),
   )
 import Hasql.Generator.Internal.Database.Transaction (transaction)
 import Hasql.Transaction (Transaction)
@@ -74,25 +74,51 @@ getParameterAndResultMetadata ::
   Maybe (NonEmpty QueryParameter) ->
   Maybe (NonEmpty QueryResult) ->
   Transaction PostgresqlParameterAndResultMetadata
-getParameterAndResultMetadata mTableRelations parameters results = do
-  columnMetadata <- maybe (pure []) getColumnMetadata mTableRelations
+getParameterAndResultMetadata mTableRelations mParameters mResults = do
+  columnReferenceMetadata <- maybe (pure []) getColumnReferenceMetadata mTableRelations
+
+  let toColumnMetadata = referenceToColumnMetadata columnReferenceMetadata
+      parameters = maybe [] (fmap (.parameterReference) . toList) mParameters
+      results = maybe [] (fmap coerce . toList) mResults
 
   pure
     PostgresqlParameterAndResultMetadata
-      { parameterMetadata = []
-      , resultMetadata = []
+      { parameterMetadata = fmap toColumnMetadata parameters
+      , resultMetadata = fmap toColumnMetadata results
       }
+  where
+    referenceToColumnMetadata ::
+      [ColumnReferenceMetadata] ->
+      Text ->
+      ColumnMetadata
+    referenceToColumnMetadata columnReferenceMetadata reference =
+      let referenceMetadata =
+            case filter (elem reference . (.columnReferences)) columnReferenceMetadata of
+              [] -> error $ "Reference `" <> unpack reference <> "` doesn't point to any known column."
+              [x] -> x
+              (_x : _xs) -> error $ "Reference `" <> unpack reference <> "` could not be resolved to a single column."
+       in toColumnMetadata referenceMetadata
+      where
+        toColumnMetadata ::
+          ColumnReferenceMetadata ->
+          ColumnMetadata
+        toColumnMetadata referenceMetadata =
+          ColumnMetadata
+            { columnType = referenceMetadata.columnType
+            , columnNullConstraint = referenceMetadata.columnNullConstraint
+            }
 
--- | Retrieves all of the 'ColumnMetadata' for each of the 'TableRelation's.
-getColumnMetadata ::
+-- | Retrieves all of the 'ColumnReferenceMetadata' for each of the
+--   'TableRelation's.
+getColumnReferenceMetadata ::
   NonEmpty TableRelation ->
-  Transaction [ColumnMetadata]
-getColumnMetadata tableRelations = do
+  Transaction [ColumnReferenceMetadata]
+getColumnReferenceMetadata tableRelations = do
   let tableNames = toList $ fmap tableRelationToTableName tableRelations
   allTypeInformation <- getColumnTypeInformation tableNames
 
   let relationsWithMetadata =
-        fmap (toTableRelationAndColumnMetadata allTypeInformation) tableRelations
+        fmap (toTableRelationAndColumnReferenceMetadata allTypeInformation) tableRelations
       allMetadata = foldl' adjustNullability [] relationsWithMetadata
   pure $ concat allMetadata
   where
@@ -102,21 +128,21 @@ getColumnMetadata tableRelations = do
         BaseTable tableAndAlias -> tableAndAlias.table
         JoinTable joinInformation -> joinInformation.tableAndAlias.table
 
-    toTableRelationAndColumnMetadata ::
+    toTableRelationAndColumnReferenceMetadata ::
       Map TableName [ColumnTypeInformation] ->
       TableRelation ->
-      (TableRelation, [ColumnMetadata])
-    toTableRelationAndColumnMetadata allTypeInformation tableRelation =
+      (TableRelation, [ColumnReferenceMetadata])
+    toTableRelationAndColumnReferenceMetadata allTypeInformation tableRelation =
       let tableName = tableRelationToTableName tableRelation
           -- TODO: Defend the use of `!` or use something like 'lookup' instead
           tableTypeInformation = allTypeInformation ! tableName
-          columnMetadata = fmap toColumnMetadata tableTypeInformation
-       in (tableRelation, columnMetadata)
+          columnReferenceMetadata = fmap toColumnReferenceMetadata tableTypeInformation
+       in (tableRelation, columnReferenceMetadata)
       where
-        toColumnMetadata ::
+        toColumnReferenceMetadata ::
           ColumnTypeInformation ->
-          ColumnMetadata
-        toColumnMetadata typeInfo =
+          ColumnReferenceMetadata
+        toColumnReferenceMetadata typeInfo =
           let tableAndAlias = case tableRelation of
                 BaseTable t -> t
                 JoinTable joinInformation -> joinInformation.tableAndAlias
@@ -131,30 +157,30 @@ getColumnMetadata tableRelations = do
                     [ alias <> "." <> typeInfo.columnName
                     , typeInfo.columnName
                     ]
-           in ColumnMetadata
+           in ColumnReferenceMetadata
                 { columnReferences = references
                 , columnType = typeInfo.columnUnderlyingType
                 , columnNullConstraint = typeInfo.columnNullConstraint
                 }
 
     adjustNullability ::
-      [[ColumnMetadata]] ->
-      (TableRelation, [ColumnMetadata]) ->
-      [[ColumnMetadata]]
-    adjustNullability acc (relation, columnMetadata) =
+      [[ColumnReferenceMetadata]] ->
+      (TableRelation, [ColumnReferenceMetadata]) ->
+      [[ColumnReferenceMetadata]]
+    adjustNullability acc (relation, columnReferenceMetadata) =
       case tableRelationToJoinType relation of
-        Nothing -> acc ++ [columnMetadata]
-        Just InnerJoin -> acc ++ [columnMetadata]
-        Just LeftJoin -> acc ++ [fmap forceNullable columnMetadata]
-        Just RightJoin -> fmap (fmap forceNullable) acc ++ [columnMetadata]
+        Nothing -> acc ++ [columnReferenceMetadata]
+        Just InnerJoin -> acc ++ [columnReferenceMetadata]
+        Just LeftJoin -> acc ++ [fmap forceNullable columnReferenceMetadata]
+        Just RightJoin -> fmap (fmap forceNullable) acc ++ [columnReferenceMetadata]
         Just FullJoin ->
           case unsnoc acc of
             Nothing ->
-              acc ++ [fmap forceNullable columnMetadata]
-            Just (initial, priorColumnMetadata) ->
+              acc ++ [fmap forceNullable columnReferenceMetadata]
+            Just (initial, priorColumnReferenceMetadata) ->
               initial
-                ++ [ fmap forceNullable priorColumnMetadata
-                   , fmap forceNullable columnMetadata
+                ++ [ fmap forceNullable priorColumnReferenceMetadata
+                   , fmap forceNullable columnReferenceMetadata
                    ]
       where
         tableRelationToJoinType ::
@@ -165,8 +191,8 @@ getColumnMetadata tableRelations = do
           JoinTable joinInformation -> Just joinInformation.joinType
 
         forceNullable ::
-          ColumnMetadata ->
-          ColumnMetadata
+          ColumnReferenceMetadata ->
+          ColumnReferenceMetadata
         forceNullable metadata = metadata {columnNullConstraint = Null}
 
 -- | Retrieves the 'ColumnTypeInformation' for each of the columns in the

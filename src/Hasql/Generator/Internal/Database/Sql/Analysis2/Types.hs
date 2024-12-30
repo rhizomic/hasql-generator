@@ -3,7 +3,9 @@ module Hasql.Generator.Internal.Database.Sql.Analysis2.Types
     NullabilityConstraint (..),
     TableName (..),
     ColumnTypeInformation (..),
+    ColumnReferenceMetadata (..),
     ColumnMetadata (..),
+    PostgresqlParameterAndResultMetadata (..),
   )
 where
 
@@ -88,8 +90,20 @@ data ColumnTypeInformation = ColumnTypeInformation
   deriving stock (Show, Eq)
 
 -- TODO: Docs
-data ColumnMetadata = ColumnMetadata
+data ColumnReferenceMetadata = ColumnReferenceMetadata
   { columnReferences :: NonEmpty Text
   , columnType :: PostgresqlType
   , columnNullConstraint :: NullabilityConstraint
+  }
+
+-- TODO: Docs
+data ColumnMetadata = ColumnMetadata
+  { columnType :: PostgresqlType
+  , columnNullConstraint :: NullabilityConstraint
+  }
+
+-- | A collection of parameter and result metadata for a given query.
+data PostgresqlParameterAndResultMetadata = PostgresqlParameterAndResultMetadata
+  { parameterMetadata :: [ColumnMetadata]
+  , resultMetadata :: [ColumnMetadata]
   }

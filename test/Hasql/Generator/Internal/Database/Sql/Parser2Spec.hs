@@ -6,15 +6,21 @@ module Hasql.Generator.Internal.Database.Sql.Parser2Spec (spec) where
 import Data.Function (($))
 import Data.Functor ((<$>))
 import Data.List (sortBy)
+import Data.List.NonEmpty (fromList, nonEmpty, sort)
 import Data.Maybe (Maybe (Just, Nothing))
 import Data.Ord (compare)
 import Data.Text (unpack)
-import Hasql.Generator.Internal.Database.Sql.Parser2 (parseLimit, parseParameters, parseResults, parseTableRelations)
+import Hasql.Generator.Internal.Database.Sql.Parser2
+  ( parseLimit,
+    parseQueryParameters,
+    parseQueryResults,
+    parseTableRelations,
+  )
 import Hasql.Generator.Internal.Database.Sql.Parser2.Types
   ( JoinInformation (JoinInformation, joinType, tableAndAlias),
-    Parameter (Parameter, parameterNumber, parameterReference),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin),
-    Result (Result),
+    QueryParameter (QueryParameter, parameterNumber, parameterReference),
+    QueryResult (QueryResult),
     TableAndAlias (TableAndAlias, alias, table),
     TableRelation (BaseTable, JoinTable),
   )
@@ -37,12 +43,13 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              ]
+              nonEmpty
+                [ BaseTable
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -52,21 +59,22 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Nothing
-                          }
-                    , joinType = InnerJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Nothing
+                            }
+                      , joinType = InnerJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -76,21 +84,22 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Nothing
-                          }
-                    , joinType = InnerJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Nothing
+                            }
+                      , joinType = InnerJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -100,21 +109,22 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Nothing
-                          }
-                    , joinType = LeftJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Nothing
+                            }
+                      , joinType = LeftJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -128,30 +138,31 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Nothing
-                          }
-                    , joinType = InnerJoin
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "phone_numbers"
-                          , alias = Nothing
-                          }
-                    , joinType = LeftJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Nothing
+                            }
+                      , joinType = InnerJoin
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "phone_numbers"
+                            , alias = Nothing
+                            }
+                      , joinType = LeftJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -166,39 +177,40 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Nothing
-                          }
-                    , joinType = LeftJoin
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "phone_numbers"
-                          , alias = Nothing
-                          }
-                    , joinType = LeftJoin
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "mfa_settings"
-                          , alias = Nothing
-                          }
-                    , joinType = LeftJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Nothing
+                            }
+                      , joinType = LeftJoin
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "phone_numbers"
+                            , alias = Nothing
+                            }
+                      , joinType = LeftJoin
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "mfa_settings"
+                            , alias = Nothing
+                            }
+                      , joinType = LeftJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -213,39 +225,40 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Just "u"
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Just "a"
-                          }
-                    , joinType = InnerJoin
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "phone_numbers"
-                          , alias = Just "p"
-                          }
-                    , joinType = LeftJoin
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "mfa_settings"
-                          , alias = Nothing
-                          }
-                    , joinType = LeftJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Just "u"
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Just "a"
+                            }
+                      , joinType = InnerJoin
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "phone_numbers"
+                            , alias = Just "p"
+                            }
+                      , joinType = LeftJoin
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "mfa_settings"
+                            , alias = Nothing
+                            }
+                      , joinType = LeftJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -258,21 +271,22 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Nothing
-                          }
-                    , joinType = FullJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Nothing
+                            }
+                      , joinType = FullJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -285,21 +299,22 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Nothing
-                          }
-                    , joinType = InnerJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Nothing
+                            }
+                      , joinType = InnerJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -310,12 +325,13 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -331,30 +347,31 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Just "u"
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "nicknames"
-                          , alias = Just "n"
-                          }
-                    , joinType = InnerJoin
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Just "a"
-                          }
-                    , joinType = InnerJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Just "u"
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "nicknames"
+                            , alias = Just "n"
+                            }
+                      , joinType = InnerJoin
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Just "a"
+                            }
+                      , joinType = InnerJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -370,39 +387,40 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "users"
-                          , alias = Just "u"
-                          }
-                    , joinType = InnerJoin
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Just "a"
-                          }
-                    , joinType = InnerJoin
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "nicknames"
-                          , alias = Just "n"
-                          }
-                    , joinType = LeftJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "users"
+                            , alias = Just "u"
+                            }
+                      , joinType = InnerJoin
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Just "a"
+                            }
+                      , joinType = InnerJoin
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "nicknames"
+                            , alias = Just "n"
+                            }
+                      , joinType = LeftJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -413,12 +431,13 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -432,21 +451,22 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Just "u"
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "nicknames"
-                          , alias = Just "n"
-                          }
-                    , joinType = InnerJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Just "u"
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "nicknames"
+                            , alias = Just "n"
+                            }
+                      , joinType = InnerJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -461,30 +481,31 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Just "u"
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "nicknames"
-                          , alias = Just "n"
-                          }
-                    , joinType = InnerJoin
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "addresses"
-                          , alias = Just "a"
-                          }
-                    , joinType = LeftJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Just "u"
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "nicknames"
+                            , alias = Just "n"
+                            }
+                      , joinType = InnerJoin
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "addresses"
+                            , alias = Just "a"
+                            }
+                      , joinType = LeftJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -495,12 +516,13 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -514,30 +536,31 @@ spec = do
 
         let actual = parseTableRelations result
             expected =
-              [ BaseTable $
-                  TableAndAlias
-                    { table = "users"
-                    , alias = Nothing
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "users"
-                          , alias = Just "u"
-                          }
-                    , joinType = InnerJoin
-                    }
-              , JoinTable $
-                  JoinInformation
-                    { tableAndAlias =
-                        TableAndAlias
-                          { table = "nicknames"
-                          , alias = Just "n"
-                          }
-                    , joinType = LeftJoin
-                    }
-              ]
+              nonEmpty
+                [ BaseTable $
+                    TableAndAlias
+                      { table = "users"
+                      , alias = Nothing
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "users"
+                            , alias = Just "u"
+                            }
+                      , joinType = InnerJoin
+                      }
+                , JoinTable $
+                    JoinInformation
+                      { tableAndAlias =
+                          TableAndAlias
+                            { table = "nicknames"
+                            , alias = Just "n"
+                            }
+                      , joinType = LeftJoin
+                      }
+                ]
 
         actual `shouldBe` expected
 
@@ -569,13 +592,13 @@ spec = do
 
       actual `shouldBe` expected
 
-  describe "parseParameters" do
+  describe "parseQueryParameters" do
     it "Parses no parameters from a query that lacks parameters" $ do
       let query = "select u.name from users"
       result <- assertRight <$> parseSql (unpack query)
 
-      let expected = []
-          actual = sortParameters $ parseParameters result
+      let expected = Nothing
+          actual = sort <$> parseQueryParameters result
 
       actual `shouldBe` expected
 
@@ -585,16 +608,17 @@ spec = do
         result <- assertRight <$> parseSql (unpack query)
 
         let expected =
-              [ Parameter
-                  { parameterNumber = 1
-                  , parameterReference = "id"
-                  }
-              , Parameter
-                  { parameterNumber = 2
-                  , parameterReference = "created_at"
-                  }
-              ]
-            actual = sortParameters $ parseParameters result
+              nonEmpty
+                [ QueryParameter
+                    { parameterNumber = 1
+                    , parameterReference = "id"
+                    }
+                , QueryParameter
+                    { parameterNumber = 2
+                    , parameterReference = "created_at"
+                    }
+                ]
+            actual = sort <$> parseQueryParameters result
 
         actual `shouldBe` expected
 
@@ -603,16 +627,17 @@ spec = do
         result <- assertRight <$> parseSql (unpack query)
 
         let expected =
-              [ Parameter
-                  { parameterNumber = 1
-                  , parameterReference = "u.id"
-                  }
-              , Parameter
-                  { parameterNumber = 2
-                  , parameterReference = "u.id"
-                  }
-              ]
-            actual = sortParameters $ parseParameters result
+              nonEmpty
+                [ QueryParameter
+                    { parameterNumber = 1
+                    , parameterReference = "u.id"
+                    }
+                , QueryParameter
+                    { parameterNumber = 2
+                    , parameterReference = "u.id"
+                    }
+                ]
+            actual = sort <$> parseQueryParameters result
 
         actual `shouldBe` expected
 
@@ -621,20 +646,21 @@ spec = do
         result <- assertRight <$> parseSql (unpack query)
 
         let expected =
-              [ Parameter
-                  { parameterNumber = 1
-                  , parameterReference = "a.city"
-                  }
-              , Parameter
-                  { parameterNumber = 2
-                  , parameterReference = "u.id"
-                  }
-              , Parameter
-                  { parameterNumber = 3
-                  , parameterReference = "a.line_2"
-                  }
-              ]
-            actual = sortParameters $ parseParameters result
+              nonEmpty
+                [ QueryParameter
+                    { parameterNumber = 1
+                    , parameterReference = "a.city"
+                    }
+                , QueryParameter
+                    { parameterNumber = 2
+                    , parameterReference = "u.id"
+                    }
+                , QueryParameter
+                    { parameterNumber = 3
+                    , parameterReference = "a.line_2"
+                    }
+                ]
+            actual = sort <$> parseQueryParameters result
 
         actual `shouldBe` expected
 
@@ -644,16 +670,17 @@ spec = do
         result <- assertRight <$> parseSql (unpack query)
 
         let expected =
-              [ Parameter
-                  { parameterNumber = 1
-                  , parameterReference = "name"
-                  }
-              , Parameter
-                  { parameterNumber = 2
-                  , parameterReference = "id"
-                  }
-              ]
-            actual = sortParameters $ parseParameters result
+              nonEmpty
+                [ QueryParameter
+                    { parameterNumber = 1
+                    , parameterReference = "name"
+                    }
+                , QueryParameter
+                    { parameterNumber = 2
+                    , parameterReference = "id"
+                    }
+                ]
+            actual = sort <$> parseQueryParameters result
 
         actual `shouldBe` expected
 
@@ -671,28 +698,29 @@ spec = do
         result <- assertRight <$> parseSql (unpack query)
 
         let expected =
-              [ Parameter
-                  { parameterNumber = 1
-                  , parameterReference = "u.name"
-                  }
-              , Parameter
-                  { parameterNumber = 2
-                  , parameterReference = "n.short_version"
-                  }
-              , Parameter
-                  { parameterNumber = 3
-                  , parameterReference = "n.long_version"
-                  }
-              , Parameter
-                  { parameterNumber = 4
-                  , parameterReference = "n.long_version"
-                  }
-              , Parameter
-                  { parameterNumber = 5
-                  , parameterReference = "a.city"
-                  }
-              ]
-            actual = sortParameters $ parseParameters result
+              nonEmpty
+                [ QueryParameter
+                    { parameterNumber = 1
+                    , parameterReference = "u.name"
+                    }
+                , QueryParameter
+                    { parameterNumber = 2
+                    , parameterReference = "n.short_version"
+                    }
+                , QueryParameter
+                    { parameterNumber = 3
+                    , parameterReference = "n.long_version"
+                    }
+                , QueryParameter
+                    { parameterNumber = 4
+                    , parameterReference = "n.long_version"
+                    }
+                , QueryParameter
+                    { parameterNumber = 5
+                    , parameterReference = "a.city"
+                    }
+                ]
+            actual = sort <$> parseQueryParameters result
 
         actual `shouldBe` expected
 
@@ -710,16 +738,17 @@ spec = do
         result <- assertRight <$> parseSql (unpack query)
 
         let expected =
-              [ Parameter
-                  { parameterNumber = 1
-                  , parameterReference = "n.long_version"
-                  }
-              , Parameter
-                  { parameterNumber = 2
-                  , parameterReference = "n.short_version"
-                  }
-              ]
-            actual = sortParameters $ parseParameters result
+              nonEmpty
+                [ QueryParameter
+                    { parameterNumber = 1
+                    , parameterReference = "n.long_version"
+                    }
+                , QueryParameter
+                    { parameterNumber = 2
+                    , parameterReference = "n.short_version"
+                    }
+                ]
+            actual = sort <$> parseQueryParameters result
 
         actual `shouldBe` expected
 
@@ -734,30 +763,32 @@ spec = do
         result <- assertRight <$> parseSql (unpack query)
 
         let expected =
-              [ Parameter
-                  { parameterNumber = 1
-                  , parameterReference = "n.short_version"
-                  }
-              , Parameter
-                  { parameterNumber = 2
-                  , parameterReference = "p.use_dark_mode"
-                  }
-              ]
-            actual = sortParameters $ parseParameters result
+              nonEmpty
+                [ QueryParameter
+                    { parameterNumber = 1
+                    , parameterReference = "n.short_version"
+                    }
+                , QueryParameter
+                    { parameterNumber = 2
+                    , parameterReference = "p.use_dark_mode"
+                    }
+                ]
+            actual = sort <$> parseQueryParameters result
 
         actual `shouldBe` expected
 
-  describe "parseResults" $ do
+  describe "parseQueryResults" $ do
     describe "When given a select statement" $ do
       it "returns the correct results for a query that makes no use of aliases or joins" $ do
         let query = "select id, name from users"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "id"
-              , Result "name"
-              ]
+              nonEmpty
+                [ QueryResult "id"
+                , QueryResult "name"
+                ]
 
         actual `shouldBe` expected
 
@@ -765,11 +796,12 @@ spec = do
         let query = "select u.id, u.name from users u"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "u.id"
-              , Result "u.name"
-              ]
+              nonEmpty
+                [ QueryResult "u.id"
+                , QueryResult "u.name"
+                ]
 
         actual `shouldBe` expected
 
@@ -780,11 +812,12 @@ spec = do
               \join nicknames on users.id = nicknames.user_id"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "id"
-              , Result "full_name"
-              ]
+              nonEmpty
+                [ QueryResult "id"
+                , QueryResult "full_name"
+                ]
 
         actual `shouldBe` expected
 
@@ -795,11 +828,12 @@ spec = do
               \join nicknames n on u.id = n.user_id"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "u.id"
-              , Result "n.full_name"
-              ]
+              nonEmpty
+                [ QueryResult "u.id"
+                , QueryResult "n.full_name"
+                ]
 
         actual `shouldBe` expected
 
@@ -808,8 +842,8 @@ spec = do
         let query = "delete from users"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
-            expected = []
+        let actual = parseQueryResults result
+            expected = Nothing
 
         actual `shouldBe` expected
 
@@ -817,11 +851,12 @@ spec = do
         let query = "delete from users returning id, email"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "id"
-              , Result "email"
-              ]
+              nonEmpty
+                [ QueryResult "id"
+                , QueryResult "email"
+                ]
 
         actual `shouldBe` expected
 
@@ -836,12 +871,13 @@ spec = do
               \returning u.id, a.postal_code, n.first_name"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "u.id"
-              , Result "a.postal_code"
-              , Result "n.first_name"
-              ]
+              nonEmpty
+                [ QueryResult "u.id"
+                , QueryResult "a.postal_code"
+                , QueryResult "n.first_name"
+                ]
 
         actual `shouldBe` expected
 
@@ -850,8 +886,8 @@ spec = do
         let query = "update users set name = $1"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
-            expected = []
+        let actual = parseQueryResults result
+            expected = Nothing
 
         actual `shouldBe` expected
 
@@ -859,10 +895,11 @@ spec = do
         let query = "update users set name = $1 returning id"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "id"
-              ]
+              nonEmpty
+                [ QueryResult "id"
+                ]
 
         actual `shouldBe` expected
 
@@ -875,11 +912,12 @@ spec = do
               \returning u.id, u.name"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "u.id"
-              , Result "u.name"
-              ]
+              nonEmpty
+                [ QueryResult "u.id"
+                , QueryResult "u.name"
+                ]
 
         actual `shouldBe` expected
 
@@ -893,12 +931,13 @@ spec = do
               \returning u.id, u.name, u.created_at"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "u.id"
-              , Result "u.name"
-              , Result "u.created_at"
-              ]
+              nonEmpty
+                [ QueryResult "u.id"
+                , QueryResult "u.name"
+                , QueryResult "u.created_at"
+                ]
 
         actual `shouldBe` expected
 
@@ -907,10 +946,11 @@ spec = do
         let query = "insert into users (email, name) values ($1, $2) returning id"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "id"
-              ]
+              nonEmpty
+                [ QueryResult "id"
+                ]
 
         actual `shouldBe` expected
 
@@ -923,13 +963,11 @@ spec = do
               \returning id, email, name"
         result <- assertRight <$> parseSql (unpack query)
 
-        let actual = parseResults result
+        let actual = parseQueryResults result
             expected =
-              [ Result "id"
-              , Result "email"
-              , Result "name"
-              ]
+              nonEmpty
+                [ QueryResult "id"
+                , QueryResult "email"
+                , QueryResult "name"
+                ]
         actual `shouldBe` expected
-
-sortParameters :: [Parameter] -> [Parameter]
-sortParameters = sortBy (\x y -> compare x.parameterNumber y.parameterNumber)

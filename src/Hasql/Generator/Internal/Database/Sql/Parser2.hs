@@ -1,7 +1,7 @@
 module Hasql.Generator.Internal.Database.Sql.Parser2
   ( parseLimit,
-    parseParameters,
-    parseResults,
+    parseQueryParameters,
+    parseQueryResults,
     parseTableRelations,
   )
 where
@@ -14,7 +14,7 @@ import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
 import Data.Int (Int)
 import Data.List (null, (++))
-import Data.List.NonEmpty (head, nonEmpty)
+import Data.List.NonEmpty (NonEmpty, head, nonEmpty)
 import Data.Maybe
   ( Maybe (Just, Nothing),
     catMaybes,
@@ -28,9 +28,9 @@ import Data.Text (Text, intercalate)
 import GHC.Real (fromIntegral)
 import Hasql.Generator.Internal.Database.Sql.Parser2.Types
   ( JoinInformation (JoinInformation, joinType, tableAndAlias),
-    Parameter (Parameter, parameterNumber, parameterReference),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin, RightJoin),
-    Result (Result),
+    QueryParameter (QueryParameter, parameterNumber, parameterReference),
+    QueryResult (QueryResult),
     TableAndAlias (TableAndAlias, alias, table),
     TableRelation (BaseTable, JoinTable),
   )
@@ -130,14 +130,14 @@ parseLimit result =
       fromIntegral . view ival
         <$> (view maybe'ival =<< view maybe'aConst subNode)
 
-parseParameters ::
+parseQueryParameters ::
   ParseResult ->
-  [Parameter]
-parseParameters result =
+  Maybe (NonEmpty QueryParameter)
+parseQueryParameters result =
   let statements = toListOf (stmts . traverse . stmt) result
-   in nodesToParameters statements
+   in nonEmpty $ nodesToParameters statements
   where
-    nodesToParameters :: [Node] -> [Parameter]
+    nodesToParameters :: [Node] -> [QueryParameter]
     nodesToParameters [] = []
     nodesToParameters statements =
       let selectStatements = fmap (view selectStmt) statements
@@ -165,7 +165,7 @@ parseParameters result =
           whereClauses = selectWhereClauses ++ updateWhereClauses ++ deleteWhereClauses ++ insertSelectWhereClauses
        in concatMap nodeToParameters (updateTargetList ++ joinClauses ++ whereClauses)
 
-    nodeToParameters :: Node -> [Parameter]
+    nodeToParameters :: Node -> [QueryParameter]
     nodeToParameters subNode =
       case view maybe'node subNode of
         Just (Node'BoolExpr expr) ->
@@ -179,7 +179,7 @@ parseParameters result =
           nodesToParameters $ toListOf subselect subLink
         _ -> []
 
-    aExprToParameters :: A_Expr -> [Parameter]
+    aExprToParameters :: A_Expr -> [QueryParameter]
     aExprToParameters aExpression =
       case (view maybe'lexpr aExpression, view maybe'rexpr aExpression) of
         (Just leftNode, Just rightNode) ->
@@ -200,12 +200,12 @@ parseParameters result =
         toParameter ::
           ColumnRef ->
           ParamRef ->
-          Parameter
+          QueryParameter
         toParameter columnRef paramRef =
           let parameterNumber = fromIntegral (view number paramRef)
               allFields = view fields columnRef
               parameterReference = intercalate "." (fmap nodeToText allFields)
-           in Parameter
+           in QueryParameter
                 { parameterNumber
                 , parameterReference
                 }
@@ -216,7 +216,7 @@ parseParameters result =
     listToParamRefs list =
       mapMaybe (view maybe'paramRef) (view items list)
 
-    resTargetToParameters :: ResTarget -> [Parameter]
+    resTargetToParameters :: ResTarget -> [QueryParameter]
     resTargetToParameters target =
       case view maybe'paramRef =<< view maybe'val target of
         Just paramRef ->
@@ -224,7 +224,7 @@ parseParameters result =
               suffix = case null subNodes of
                 True -> ""
                 False -> "." <> intercalate "." (fmap nodeToText subNodes)
-           in [ Parameter
+           in [ QueryParameter
                   { parameterNumber = fromIntegral (view number paramRef)
                   , parameterReference = view name target <> suffix
                   }
@@ -232,16 +232,17 @@ parseParameters result =
         Nothing ->
           []
 
-parseResults ::
+parseQueryResults ::
   ParseResult ->
-  [Result]
-parseResults result =
+  Maybe (NonEmpty QueryResult)
+parseQueryResults result =
   let allStatements = toListOf (stmts . traverse . stmt) result
-   in case nonEmpty allStatements of
+      results = case nonEmpty allStatements of
         Just statements -> nodeToResults $ head statements
         Nothing -> []
+   in nonEmpty results
   where
-    nodeToResults :: Node -> [Result]
+    nodeToResults :: Node -> [QueryResult]
     nodeToResults statement =
       let mSelectStatement = view maybe'selectStmt statement
           selectResults = maybe [] getResultsFromSelect mSelectStatement
@@ -256,47 +257,48 @@ parseResults result =
           insertResults = maybe [] getResultsFromInsert mInsertStatement
        in selectResults ++ deleteResults ++ updateResults ++ insertResults
       where
-        getResultsFromSelect :: SelectStmt -> [Result]
+        getResultsFromSelect :: SelectStmt -> [QueryResult]
         getResultsFromSelect selectStatement =
           let targetLists = view targetList selectStatement
               resTargets = fmap (view resTarget) targetLists
            in mapMaybe resTargetToResult resTargets
 
-        getResultsFromDelete :: DeleteStmt -> [Result]
+        getResultsFromDelete :: DeleteStmt -> [QueryResult]
         getResultsFromDelete deleteStatement =
           let returningLists = view returningList deleteStatement
               resTargets = fmap (view resTarget) returningLists
            in mapMaybe resTargetToResult resTargets
 
-        getResultsFromUpdate :: UpdateStmt -> [Result]
+        getResultsFromUpdate :: UpdateStmt -> [QueryResult]
         getResultsFromUpdate updateStatement =
           let returningLists = view returningList updateStatement
               resTargets = fmap (view resTarget) returningLists
            in mapMaybe resTargetToResult resTargets
 
-        getResultsFromInsert :: InsertStmt -> [Result]
+        getResultsFromInsert :: InsertStmt -> [QueryResult]
         getResultsFromInsert insertStatement =
           let returningLists = view returningList insertStatement
               resTargets = fmap (view resTarget) returningLists
            in mapMaybe resTargetToResult resTargets
 
-        resTargetToResult :: ResTarget -> Maybe Result
+        resTargetToResult :: ResTarget -> Maybe QueryResult
         resTargetToResult target =
           case view maybe'columnRef =<< view maybe'val target of
             Nothing -> Nothing
             Just columnRef ->
               let allFields = view fields columnRef
                   columnName = intercalate "." (fmap nodeToText allFields)
-               in Just $ Result columnName
+               in Just $ QueryResult columnName
 
 parseTableRelations ::
   ParseResult ->
-  [TableRelation]
+  Maybe (NonEmpty TableRelation)
 parseTableRelations result =
   let allStatements = toListOf (stmts . traverse . stmt) result
-   in case nonEmpty allStatements of
+      relations = case nonEmpty allStatements of
         Just statements -> nodeToTableRelations $ head statements
         Nothing -> []
+   in nonEmpty relations
   where
     nodeToTableRelations :: Node -> [TableRelation]
     nodeToTableRelations statement =

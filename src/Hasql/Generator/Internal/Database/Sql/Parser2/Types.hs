@@ -5,14 +5,15 @@ module Hasql.Generator.Internal.Database.Sql.Parser2.Types
     TableAndAlias (..),
     JoinInformation (..),
     TableRelation (..),
-    Parameter (..),
-    Result (..),
+    QueryParameter (..),
+    QueryResult (..),
   )
 where
 
 import Data.Eq (Eq)
 import Data.Int (Int)
 import Data.Maybe (Maybe)
+import Data.Ord (Ord (compare), Ordering)
 import Data.Text (Text)
 import GHC.Show (Show)
 
@@ -35,6 +36,7 @@ data PostgresqlJoinType
   | InnerJoin
   deriving stock (Show, Eq)
 
+-- TODO: Use bespoke types for each of table and alias
 data TableAndAlias = TableAndAlias
   { table :: Text
   , alias :: Maybe Text
@@ -52,11 +54,15 @@ data TableRelation
   | JoinTable JoinInformation
   deriving stock (Show, Eq)
 
-data Parameter = Parameter
+data QueryParameter = QueryParameter
   { parameterNumber :: Int
   , parameterReference :: Text
   }
   deriving stock (Show, Eq)
 
-newtype Result = Result Text
+instance Ord QueryParameter where
+  compare :: QueryParameter -> QueryParameter -> Ordering
+  compare x y = compare x.parameterNumber y.parameterNumber
+
+newtype QueryResult = QueryResult Text
   deriving newtype (Show, Eq)

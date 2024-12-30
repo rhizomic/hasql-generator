@@ -5,10 +5,8 @@ module Hasql.Generator.Internal.Database.Sql.Parser2Spec (spec) where
 
 import Data.Function (($))
 import Data.Functor ((<$>))
-import Data.List (sortBy)
-import Data.List.NonEmpty (fromList, nonEmpty, sort)
+import Data.List.NonEmpty (nonEmpty, sort)
 import Data.Maybe (Maybe (Just, Nothing))
-import Data.Ord (compare)
 import Data.Text (unpack)
 import Hasql.Generator.Internal.Database.Sql.Parser2
   ( parseLimit,

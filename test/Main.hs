@@ -13,6 +13,7 @@ import Hasql.Generator.Internal.Database.Sql.Parser2Spec qualified as Parser2Spe
 import Hasql.Generator.Internal.Database.Sql.ParserSpec qualified as ParserSpec
 import Hasql.Generator.Internal.Database.Transaction (paramAndResultlessTransaction, runTransaction)
 import Hasql.Generator.Internal.DatabaseSpec qualified as DatabaseSpec
+import Hasql.Generator.Internal.Renderer2Spec qualified as Renderer2Spec
 import Hasql.Generator.Internal.RendererSpec qualified as RendererSpec
 import Hasql.GeneratorSpec qualified as GeneratorSpec
 import Hasql.Pool (Pool, use)
@@ -29,7 +30,8 @@ main = do
       -- describe "Parser" ParserSpec.spec
       describe "Parser2" Parser2Spec.spec
       describe "Database" $ DatabaseSpec.spec pool
-      describe "Renderer" RendererSpec.spec
+      -- describe "Renderer" RendererSpec.spec
+      describe "Renderer2" Renderer2Spec.spec
       describe "Generator" GeneratorSpec.spec
 
 withMigratedDb ::

@@ -10,7 +10,9 @@ module Hasql.Generator.Internal.Database.Sql.Analysis2.Types
 where
 
 import Data.Eq (Eq)
+import Data.Int (Int)
 import Data.List.NonEmpty (NonEmpty)
+import Data.Maybe (Maybe)
 import Data.Ord (Ord)
 import Data.Text (Text)
 import GHC.Show (Show)
@@ -101,9 +103,12 @@ data ColumnMetadata = ColumnMetadata
   { columnType :: PostgresqlType
   , columnNullConstraint :: NullabilityConstraint
   }
+  deriving stock (Show, Eq)
 
 -- | A collection of parameter and result metadata for a given query.
 data PostgresqlParameterAndResultMetadata = PostgresqlParameterAndResultMetadata
   { parameterMetadata :: [ColumnMetadata]
   , resultMetadata :: [ColumnMetadata]
+  , resultLimit :: Maybe Int
   }
+  deriving stock (Show, Eq)

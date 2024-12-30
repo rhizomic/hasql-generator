@@ -3,41 +3,44 @@ module Hasql.Generator.Internal.Database.Sql
   )
 where
 
+import Control.Applicative (pure)
 import Data.ByteString (ByteString)
-import Data.Function (($))
-import Data.Functor (fmap)
-import Data.Text.Encoding (decodeUtf8)
-import Hasql.Generator.Internal.Database.Sql.Analysis
-  ( getParameterAndResultMetadata,
-    getParameterAndResultTypes,
-    getPreparedStatementDetails,
-  )
-import Hasql.Generator.Internal.Database.Sql.Parser (parseJoins)
-import Hasql.Generator.Internal.Database.Sql.PreparedStatement
-  ( withPreparedSql,
-  )
-import Hasql.Generator.Internal.Database.Sql.Types
-  ( PostgresqlParameterAndResultMetadata,
-    PostgresqlParameterAndResultTypeReplacements (parameterTypes),
-    PostgresqlTypeReplacement (replacement),
-  )
-import Hasql.Transaction (Transaction)
+import Data.ByteString.Char8 (unpack)
+import Data.Either (Either (Left, Right))
+import Data.Either.Extra (mapLeft)
+import Data.Function (($), (.))
+import Data.Text (Text, pack)
+import GHC.IO (IO)
+import GHC.Show (show)
+import Hasql.Generator.Internal.Database.Sql.Analysis2 (getParameterAndResultMetadata)
+import Hasql.Generator.Internal.Database.Sql.Analysis2.Types (PostgresqlParameterAndResultMetadata)
+import Hasql.Generator.Internal.Database.Sql.Parser2 (parseLimit, parseQueryParameters, parseQueryResults, parseTableRelations)
+import Hasql.Generator.Internal.Database.Transaction (runTransaction)
+import Hasql.Pool (Pool, use)
+import PgQuery (parseSql)
 
 -- | Retrieves the 'PostgresqlParameterAndResultMetadata' for a given query.
 parameterAndResultMetadata ::
+  Pool ->
   ByteString ->
-  Transaction PostgresqlParameterAndResultMetadata
-parameterAndResultMetadata sql = do
-  withPreparedSql sql $ \preparedStatementName -> do
-    parameterAndResultTypes <- getParameterAndResultTypes preparedStatementName
-    let parameterTypes =
-          fmap (.replacement) parameterAndResultTypes.parameterTypes
+  IO (Either Text PostgresqlParameterAndResultMetadata)
+parameterAndResultMetadata pool sql = do
+  eParseResult <- parseSql $ unpack sql
+  case eParseResult of
+    Left err ->
+      pure . Left $ pack err
+    Right parseResult -> do
+      let mLimit = parseLimit parseResult
+          mTableRelations = parseTableRelations parseResult
+          mQueryParameters = parseQueryParameters parseResult
+          mQueryResults = parseQueryResults parseResult
 
-    preparedStatementDetails <- getPreparedStatementDetails preparedStatementName parameterTypes
+      eMetadata <-
+        use pool . runTransaction $
+          getParameterAndResultMetadata
+            mLimit
+            mTableRelations
+            mQueryParameters
+            mQueryResults
 
-    let joins = parseJoins $ decodeUtf8 sql
-
-    getParameterAndResultMetadata
-      parameterAndResultTypes
-      joins
-      preparedStatementDetails
+      pure $ mapLeft (pack . show) eMetadata

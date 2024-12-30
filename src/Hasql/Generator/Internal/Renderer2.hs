@@ -19,7 +19,7 @@ import GHC.Show (show)
 import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
   ( ColumnMetadata (columnNullConstraint, columnType),
     NullabilityConstraint (NotNull, Null),
-    PostgresqlParameterAndResultMetadata (parameterMetadata, resultMetadata),
+    PostgresqlParameterAndResultMetadata (parameterMetadata, resultLimit, resultMetadata),
     PostgresqlType
       ( PgBool,
         PgBytea,
@@ -48,15 +48,17 @@ import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
 toHaskell ::
   ByteString ->
   PostgresqlParameterAndResultMetadata ->
-  Maybe Int ->
   Text ->
   Text ->
   Text
-toHaskell sql parameterAndResultMetadata limit moduleName functionName =
+toHaskell sql parameterAndResultMetadata moduleName functionName =
   haskellOutput
     (fmap columnMetadataToTuple parameterAndResultMetadata.parameterMetadata)
     (fmap columnMetadataToTuple parameterAndResultMetadata.resultMetadata)
   where
+    limit :: Maybe Int
+    limit = parameterAndResultMetadata.resultLimit
+
     columnMetadataToTuple ::
       ColumnMetadata ->
       (PostgresqlType, NullabilityConstraint)

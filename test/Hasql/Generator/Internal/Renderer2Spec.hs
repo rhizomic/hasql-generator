@@ -8,7 +8,12 @@ import Data.Text (Text, unpack)
 import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
   ( ColumnMetadata (ColumnMetadata, columnNullConstraint, columnType),
     NullabilityConstraint (NotNull, Null),
-    PostgresqlParameterAndResultMetadata (PostgresqlParameterAndResultMetadata, parameterMetadata, resultMetadata),
+    PostgresqlParameterAndResultMetadata
+      ( PostgresqlParameterAndResultMetadata,
+        parameterMetadata,
+        resultLimit,
+        resultMetadata
+      ),
     PostgresqlType (PgText, PgUuid),
   )
 import Hasql.Generator.Internal.Renderer2 (toHaskell)
@@ -28,9 +33,10 @@ spec = do
             PostgresqlParameterAndResultMetadata
               { parameterMetadata = []
               , resultMetadata = []
+              , resultLimit = Nothing
               }
 
-          actual = toHaskell sql parameterAndResultMetadata Nothing "DeleteFromAddresses" "query"
+          actual = toHaskell sql parameterAndResultMetadata "DeleteFromAddresses" "query"
 
       shouldBeGolden "no_params_no_results" actual
 
@@ -45,9 +51,10 @@ spec = do
                       , columnNullConstraint = NotNull
                       }
                   ]
+              , resultLimit = Nothing
               }
 
-          actual = toHaskell sql parameterAndResultMetadata Nothing "SelectIdFromAddresses" "query"
+          actual = toHaskell sql parameterAndResultMetadata "SelectIdFromAddresses" "query"
 
       shouldBeGolden "no_params_one_result" actual
 
@@ -70,9 +77,10 @@ spec = do
                       , columnNullConstraint = Null
                       }
                   ]
+              , resultLimit = Nothing
               }
 
-          actual = toHaskell sql parameterAndResultMetadata Nothing "SelectIdLine1AndLine2FromAddresses" "query"
+          actual = toHaskell sql parameterAndResultMetadata "SelectIdLine1AndLine2FromAddresses" "query"
 
       shouldBeGolden "no_params_multiple_results" actual
 
@@ -87,9 +95,10 @@ spec = do
                       }
                   ]
               , resultMetadata = []
+              , resultLimit = Nothing
               }
 
-          actual = toHaskell sql parameterAndResultMetadata Nothing "UpdateAddresses" "query"
+          actual = toHaskell sql parameterAndResultMetadata "UpdateAddresses" "query"
 
       shouldBeGolden "one_param_no_results" actual
 
@@ -109,9 +118,10 @@ spec = do
                       , columnNullConstraint = NotNull
                       }
                   ]
+              , resultLimit = Just 1
               }
 
-          actual = toHaskell sql parameterAndResultMetadata (Just 1) "GetLine1Address" "query"
+          actual = toHaskell sql parameterAndResultMetadata "GetLine1Address" "query"
 
       shouldBeGolden "one_param_one_result" actual
 
@@ -139,9 +149,10 @@ spec = do
                       , columnNullConstraint = NotNull
                       }
                   ]
+              , resultLimit = Nothing
               }
 
-          actual = toHaskell sql parameterAndResultMetadata Nothing "SelectIdPostalCodeAndCountryFromAddresses" "query"
+          actual = toHaskell sql parameterAndResultMetadata "SelectIdPostalCodeAndCountryFromAddresses" "query"
 
       shouldBeGolden "one_param_multiple_results" actual
 
@@ -160,9 +171,10 @@ spec = do
                       }
                   ]
               , resultMetadata = []
+              , resultLimit = Nothing
               }
 
-          actual = toHaskell sql parameterAndResultMetadata Nothing "DeleteFromAddressesByPostalCodeAndCountry" "query"
+          actual = toHaskell sql parameterAndResultMetadata "DeleteFromAddressesByPostalCodeAndCountry" "query"
 
       shouldBeGolden "multiple_params_no_results" actual
 
@@ -186,9 +198,10 @@ spec = do
                       , columnNullConstraint = NotNull
                       }
                   ]
+              , resultLimit = Nothing
               }
 
-          actual = toHaskell sql parameterAndResultMetadata Nothing "SelectIdFromAddressesByUserIdAndCity" "query"
+          actual = toHaskell sql parameterAndResultMetadata "SelectIdFromAddressesByUserIdAndCity" "query"
 
       shouldBeGolden "multiple_params_one_result" actual
 
@@ -224,9 +237,10 @@ spec = do
                       , columnNullConstraint = Null
                       }
                   ]
+              , resultLimit = Nothing
               }
 
-          actual = toHaskell sql parameterAndResultMetadata Nothing "SelectIdLine1AndLine2FromAddressesByCityPostalCodeOrCountry" "query"
+          actual = toHaskell sql parameterAndResultMetadata "SelectIdLine1AndLine2FromAddressesByCityPostalCodeOrCountry" "query"
 
       shouldBeGolden "multiple_params_multiple_results" actual
 

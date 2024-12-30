@@ -19,6 +19,7 @@ import Data.Traversable (traverse)
 import GHC.IO (IO)
 import GHC.Show (Show (show))
 import Hasql.Generator.Internal.Database (withDb)
+import Hasql.Generator.Internal.Database.Sql (parameterAndResultMetadata)
 import Hasql.Generator.Internal.Database.Sql.Analysis2 (getParameterAndResultMetadata)
 import Hasql.Generator.Internal.Database.Sql.Parser (parseLimit)
 import Hasql.Generator.Internal.Database.Sql.Parser2 (parseQueryParameters, parseQueryResults, parseTableRelations)
@@ -87,38 +88,20 @@ generate schemaFile queries = do
     renderToFile :: Pool -> QueryConfig -> IO (Either (Text, QueryConfig) ())
     renderToFile pool query = do
       sql <- readFile query.inputFile
-      eParseResult <- parseSql $ unpack sql
-      -- TODO: Clean all this branching up
-      case eParseResult of
+      eResult <- parameterAndResultMetadata pool sql
+
+      case eResult of
         Left err ->
-          pure $ Left (toError (pack $ show err), query)
-        Right parseResult -> do
-          let mLimit = parseLimit parseResult
-              mTableRelations = parseTableRelations parseResult
-              mQueryParameters = parseQueryParameters parseResult
-              mQueryResults = parseQueryResults parseResult
-
-          eMetadata <-
-            use pool . runTransaction $
-              getParameterAndResultMetadata
-                mTableRelations
-                mQueryParameters
-                mQueryResults
-
-          case eMetadata of
-            Left err ->
-              pure $ Left (toError (pack $ show err), query)
-            Right metadata -> do
-              let result = toHaskell sql metadata mLimit query.moduleName query.functionName
-              writeFile query.outputLocation result
-              pure $ Right ()
-      where
-        toError :: Text -> Text
-        toError err =
-          "Could not render Hasql code for "
-            <> pack (show query.inputFile)
-            <> ". Reason(s): "
-            <> err
+          let errorMessage =
+                "Could not render Hasql code for "
+                  <> pack (show query.inputFile)
+                  <> ". Reason(s): "
+                  <> err
+           in pure $ Left (errorMessage, query)
+        Right metadata -> do
+          let result = toHaskell sql metadata query.moduleName query.functionName
+          writeFile query.outputLocation result
+          pure $ Right ()
 
     queriesWithError :: Text -> NonEmpty (Text, QueryConfig)
     queriesWithError errorMessage =

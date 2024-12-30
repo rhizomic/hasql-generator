@@ -10,6 +10,7 @@ import Data.Coerce (coerce)
 import Data.Foldable (elem, foldl')
 import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
+import Data.Int (Int)
 import Data.List (concat, filter, unsnoc, (++))
 import Data.List.NonEmpty (NonEmpty, fromList, toList)
 import Data.Map.Strict (Map, fromListWith, (!))
@@ -32,7 +33,12 @@ import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
         columnUnderlyingType
       ),
     NullabilityConstraint (NotNull, Null),
-    PostgresqlParameterAndResultMetadata (PostgresqlParameterAndResultMetadata, parameterMetadata, resultMetadata),
+    PostgresqlParameterAndResultMetadata
+      ( PostgresqlParameterAndResultMetadata,
+        parameterMetadata,
+        resultLimit,
+        resultMetadata
+      ),
     PostgresqlType
       ( PgBool,
         PgBytea,
@@ -73,11 +79,12 @@ import Hasql.Generator.Internal.Database.Transaction (transaction)
 import Hasql.Transaction (Transaction)
 
 getParameterAndResultMetadata ::
+  Maybe Int ->
   Maybe (NonEmpty TableRelation) ->
   Maybe (NonEmpty QueryParameter) ->
   Maybe (NonEmpty QueryResult) ->
   Transaction PostgresqlParameterAndResultMetadata
-getParameterAndResultMetadata mTableRelations mParameters mResults = do
+getParameterAndResultMetadata mResultLimit mTableRelations mParameters mResults = do
   columnReferenceMetadata <- maybe (pure []) getColumnReferenceMetadata mTableRelations
 
   let toColumnMetadata = referenceToColumnMetadata columnReferenceMetadata
@@ -88,6 +95,7 @@ getParameterAndResultMetadata mTableRelations mParameters mResults = do
     PostgresqlParameterAndResultMetadata
       { parameterMetadata = fmap toColumnMetadata parameters
       , resultMetadata = fmap toColumnMetadata results
+      , resultLimit = mResultLimit
       }
   where
     referenceToColumnMetadata ::

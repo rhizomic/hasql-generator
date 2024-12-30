@@ -82,91 +82,92 @@ getParameterAndResultMetadata mTableRelations parameters results = do
       { parameterMetadata = []
       , resultMetadata = []
       }
+
+-- | Retrieves all of the 'ColumnMetadata' for each of the 'TableRelation's.
+getColumnMetadata ::
+  NonEmpty TableRelation ->
+  Transaction [ColumnMetadata]
+getColumnMetadata tableRelations = do
+  let tableNames = toList $ fmap tableRelationToTableName tableRelations
+  allTypeInformation <- getColumnTypeInformation tableNames
+
+  let relationsWithMetadata =
+        fmap (toTableRelationAndColumnMetadata allTypeInformation) tableRelations
+      allMetadata = foldl' adjustNullability [] relationsWithMetadata
+  pure $ concat allMetadata
   where
-    getColumnMetadata ::
-      NonEmpty TableRelation ->
-      Transaction [ColumnMetadata]
-    getColumnMetadata tableRelations = do
-      let tableNames = toList $ fmap tableRelationToTableName tableRelations
-      allTypeInformation <- getColumnTypeInformation tableNames
+    tableRelationToTableName :: TableRelation -> TableName
+    tableRelationToTableName =
+      TableName . \case
+        BaseTable tableAndAlias -> tableAndAlias.table
+        JoinTable joinInformation -> joinInformation.tableAndAlias.table
 
-      let relationsWithMetadata =
-            fmap (toTableRelationAndColumnMetadata allTypeInformation) tableRelations
-          allMetadata = foldl' adjustNullability [] relationsWithMetadata
-      pure $ concat allMetadata
+    toTableRelationAndColumnMetadata ::
+      Map TableName [ColumnTypeInformation] ->
+      TableRelation ->
+      (TableRelation, [ColumnMetadata])
+    toTableRelationAndColumnMetadata allTypeInformation tableRelation =
+      let tableName = tableRelationToTableName tableRelation
+          -- TODO: Defend the use of `!` or use something like 'lookup' instead
+          tableTypeInformation = allTypeInformation ! tableName
+          columnMetadata = fmap toColumnMetadata tableTypeInformation
+       in (tableRelation, columnMetadata)
       where
-        tableRelationToTableName :: TableRelation -> TableName
-        tableRelationToTableName =
-          TableName . \case
-            BaseTable tableAndAlias -> tableAndAlias.table
-            JoinTable joinInformation -> joinInformation.tableAndAlias.table
-
-        adjustNullability ::
-          [[ColumnMetadata]] ->
-          (TableRelation, [ColumnMetadata]) ->
-          [[ColumnMetadata]]
-        adjustNullability acc (relation, columnMetadata) =
-          case tableRelationToJoinType relation of
-            Nothing -> acc ++ [columnMetadata]
-            Just InnerJoin -> acc ++ [columnMetadata]
-            Just LeftJoin -> acc ++ [fmap forceNullable columnMetadata]
-            Just RightJoin -> fmap (fmap forceNullable) acc ++ [columnMetadata]
-            Just FullJoin ->
-              case unsnoc acc of
+        toColumnMetadata ::
+          ColumnTypeInformation ->
+          ColumnMetadata
+        toColumnMetadata typeInfo =
+          let tableAndAlias = case tableRelation of
+                BaseTable t -> t
+                JoinTable joinInformation -> joinInformation.tableAndAlias
+              references = case tableAndAlias.alias of
                 Nothing ->
-                  acc ++ [fmap forceNullable columnMetadata]
-                Just (initial, priorColumnMetadata) ->
-                  initial
-                    ++ [ fmap forceNullable priorColumnMetadata
-                       , fmap forceNullable columnMetadata
-                       ]
-          where
-            tableRelationToJoinType ::
-              TableRelation ->
-              Maybe PostgresqlJoinType
-            tableRelationToJoinType = \case
-              BaseTable _tableAndAlias -> Nothing
-              JoinTable joinInformation -> Just joinInformation.joinType
+                  fromList
+                    [ tableAndAlias.table <> "." <> typeInfo.columnName
+                    , typeInfo.columnName
+                    ]
+                Just alias ->
+                  fromList
+                    [ alias <> "." <> typeInfo.columnName
+                    , typeInfo.columnName
+                    ]
+           in ColumnMetadata
+                { columnReferences = references
+                , columnType = typeInfo.columnUnderlyingType
+                , columnNullConstraint = typeInfo.columnNullConstraint
+                }
 
-            forceNullable ::
-              ColumnMetadata ->
-              ColumnMetadata
-            forceNullable metadata = metadata {columnNullConstraint = Null}
-
-        toTableRelationAndColumnMetadata ::
-          Map TableName [ColumnTypeInformation] ->
+    adjustNullability ::
+      [[ColumnMetadata]] ->
+      (TableRelation, [ColumnMetadata]) ->
+      [[ColumnMetadata]]
+    adjustNullability acc (relation, columnMetadata) =
+      case tableRelationToJoinType relation of
+        Nothing -> acc ++ [columnMetadata]
+        Just InnerJoin -> acc ++ [columnMetadata]
+        Just LeftJoin -> acc ++ [fmap forceNullable columnMetadata]
+        Just RightJoin -> fmap (fmap forceNullable) acc ++ [columnMetadata]
+        Just FullJoin ->
+          case unsnoc acc of
+            Nothing ->
+              acc ++ [fmap forceNullable columnMetadata]
+            Just (initial, priorColumnMetadata) ->
+              initial
+                ++ [ fmap forceNullable priorColumnMetadata
+                   , fmap forceNullable columnMetadata
+                   ]
+      where
+        tableRelationToJoinType ::
           TableRelation ->
-          (TableRelation, [ColumnMetadata])
-        toTableRelationAndColumnMetadata allTypeInformation tableRelation =
-          let tableName = tableRelationToTableName tableRelation
-              -- TODO: Defend the use of `!` or use something like 'lookup' instead
-              tableTypeInformation = allTypeInformation ! tableName
-              columnMetadata = fmap toColumnMetadata tableTypeInformation
-           in (tableRelation, columnMetadata)
-          where
-            toColumnMetadata ::
-              ColumnTypeInformation ->
-              ColumnMetadata
-            toColumnMetadata typeInfo =
-              let tableAndAlias = case tableRelation of
-                    BaseTable t -> t
-                    JoinTable joinInformation -> joinInformation.tableAndAlias
-                  references = case tableAndAlias.alias of
-                    Nothing ->
-                      fromList
-                        [ tableAndAlias.table <> "." <> typeInfo.columnName
-                        , typeInfo.columnName
-                        ]
-                    Just alias ->
-                      fromList
-                        [ alias <> "." <> typeInfo.columnName
-                        , typeInfo.columnName
-                        ]
-               in ColumnMetadata
-                    { columnReferences = references
-                    , columnType = typeInfo.columnUnderlyingType
-                    , columnNullConstraint = typeInfo.columnNullConstraint
-                    }
+          Maybe PostgresqlJoinType
+        tableRelationToJoinType = \case
+          BaseTable _tableAndAlias -> Nothing
+          JoinTable joinInformation -> Just joinInformation.joinType
+
+        forceNullable ::
+          ColumnMetadata ->
+          ColumnMetadata
+        forceNullable metadata = metadata {columnNullConstraint = Null}
 
 -- | Retrieves the 'ColumnTypeInformation' for each of the columns in the
 --   supplied tables.

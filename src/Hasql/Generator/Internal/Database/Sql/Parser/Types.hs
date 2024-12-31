@@ -1,7 +1,5 @@
 module Hasql.Generator.Internal.Database.Sql.Parser.Types
-  ( ColumnReference (..),
-    PostgresqlExpression (..),
-    PostgresqlJoinType (..),
+  ( PostgresqlJoinType (..),
     TableAndAlias (..),
     JoinInformation (..),
     TableRelation (..),
@@ -17,17 +15,7 @@ import Data.Ord (Ord (compare), Ordering)
 import Data.Text (Text)
 import GHC.Show (Show)
 
-data ColumnReference = ColumnReference
-  { tableName :: Maybe Text
-  , columnName :: Text
-  }
-
-data PostgresqlExpression
-  = -- | The expression is a constant. All 'Constant's are `not null` by
-    --   definition.
-    ConstantExpression
-  | -- | The expression is referencing a column.
-    ColumnExpression ColumnReference
+-- TODO: Docs
 
 data PostgresqlJoinType
   = FullJoin
@@ -36,7 +24,6 @@ data PostgresqlJoinType
   | InnerJoin
   deriving stock (Show, Eq)
 
--- TODO: Use bespoke types for each of table and alias
 data TableAndAlias = TableAndAlias
   { table :: Text
   , alias :: Maybe Text

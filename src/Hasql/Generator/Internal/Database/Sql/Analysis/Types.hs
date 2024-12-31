@@ -77,7 +77,7 @@ data NullabilityConstraint
 newtype TableName = TableName Text
   deriving newtype (Show, Eq, Ord)
 
--- | Metadata about a particular column in a table.
+-- | Type information about a particular column in a table.
 data ColumnTypeInformation = ColumnTypeInformation
   { columnName :: Text
   -- ^ The column name.
@@ -91,24 +91,32 @@ data ColumnTypeInformation = ColumnTypeInformation
   }
   deriving stock (Show, Eq)
 
--- TODO: Docs
+-- | Reference metadata for a particular column in a table.
 data ColumnReferenceMetadata = ColumnReferenceMetadata
   { columnReferences :: NonEmpty Text
+  -- ^ The possible references (e.g., `["users.name", "name"]`) for the column.
   , columnType :: PostgresqlType
+  -- ^ The underlying column type.
   , columnNullConstraint :: NullabilityConstraint
+  -- ^ The column nullability constraint.
   }
 
--- TODO: Docs
+-- | Metadata for a particular column in a table.
 data ColumnMetadata = ColumnMetadata
   { columnType :: PostgresqlType
+  -- ^ The underlying column type.
   , columnNullConstraint :: NullabilityConstraint
+  -- ^ The column nullability constraint.
   }
   deriving stock (Show, Eq)
 
--- | A collection of parameter and result metadata for a given query.
+-- | Metadata for the parameters and results involved in a given query.
 data PostgresqlParameterAndResultMetadata = PostgresqlParameterAndResultMetadata
   { parameterMetadata :: [ColumnMetadata]
+  -- ^ The metadata for the query parameters.
   , resultMetadata :: [ColumnMetadata]
+  -- ^ The metadata for the query results.
   , resultLimit :: Maybe Int
+  -- ^ The limit on the number of results returned by the query.
   }
   deriving stock (Show, Eq)

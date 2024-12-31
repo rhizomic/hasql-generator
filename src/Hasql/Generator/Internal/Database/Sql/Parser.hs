@@ -13,7 +13,7 @@ import Data.Foldable (concatMap)
 import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
 import Data.Int (Int)
-import Data.List (null, sort, (++))
+import Data.List (null, sort, zip, (++))
 import Data.List.NonEmpty (NonEmpty, head, nonEmpty)
 import Data.Maybe
   ( Maybe (Just, Nothing),
@@ -71,6 +71,7 @@ import PgQuery
     UpdateStmt,
     aliasname,
     args,
+    cols,
     fields,
     fromClause,
     indirection,
@@ -80,6 +81,7 @@ import PgQuery
     jointype,
     larg,
     limitCount,
+    list,
     maybe'aConst,
     maybe'alias,
     maybe'columnRef,
@@ -110,6 +112,7 @@ import PgQuery
     sval,
     targetList,
     usingClause,
+    valuesLists,
     whereClause,
   )
 
@@ -177,16 +180,43 @@ parseQueryParameters result =
 
         getParametersFromInsert :: InsertStmt -> [QueryParameter]
         getParametersFromInsert insertStatement =
-          let insertSelectStatement = view (selectStmt . selectStmt) insertStatement
+          let insertSelectWhereClause :: Node = view whereClause insertSelectStatement
 
-              insertSelectWhereClause = view whereClause insertSelectStatement
-
-              insertSelectFromClauses = view fromClause insertSelectStatement
+              insertSelectFromClauses :: [Node] = view fromClause insertSelectStatement
               joinClauses =
                 fmap
                   (view (joinExpr . quals))
                   insertSelectFromClauses
-           in concatMap nodeToParameters (insertSelectWhereClause : joinClauses)
+           in queryParametersFromInsertValues
+                ++ concatMap nodeToParameters (insertSelectWhereClause : joinClauses)
+          where
+            insertSelectStatement :: SelectStmt
+            insertSelectStatement = view (selectStmt . selectStmt) insertStatement
+
+            queryParametersFromInsertValues :: [QueryParameter]
+            queryParametersFromInsertValues =
+              let insertColumns = view cols insertStatement
+                  insertColumnNames = fmap (view (resTarget . name)) insertColumns
+
+                  insertValueLists :: [Node] = view valuesLists insertSelectStatement
+                  insertValuesItems = case nonEmpty insertValueLists of
+                    Nothing -> []
+                    Just valueList -> view (list . items) $ head valueList
+
+                  columnNamesAndValues = zip insertColumnNames insertValuesItems
+               in mapMaybe toParameter columnNamesAndValues
+              where
+                toParameter :: (Text, Node) -> Maybe QueryParameter
+                toParameter (parameterReference, node) =
+                  case view maybe'paramRef node of
+                    Nothing -> Nothing
+                    Just paramRef ->
+                      let parameterNumber = fromIntegral (view number paramRef)
+                       in Just
+                            QueryParameter
+                              { parameterNumber
+                              , parameterReference
+                              }
 
     nodeToParameters :: Node -> [QueryParameter]
     nodeToParameters subNode =
@@ -209,10 +239,10 @@ parseQueryParameters result =
               [toParameter columnRef paramRef]
             (Just (Node'ParamRef paramRef), Just (Node'ColumnRef columnRef)) ->
               [toParameter columnRef paramRef]
-            (Just (Node'ColumnRef columnRef), Just (Node'List list)) ->
-              fmap (toParameter columnRef) $ listToParamRefs list
-            (Just (Node'List list), Just (Node'ColumnRef columnRef)) ->
-              fmap (toParameter columnRef) $ listToParamRefs list
+            (Just (Node'ColumnRef columnRef), Just (Node'List nodeList)) ->
+              fmap (toParameter columnRef) $ listToParamRefs nodeList
+            (Just (Node'List nodeList), Just (Node'ColumnRef columnRef)) ->
+              fmap (toParameter columnRef) $ listToParamRefs nodeList
             _ ->
               []
         _ ->
@@ -234,8 +264,8 @@ parseQueryParameters result =
     listToParamRefs ::
       List ->
       [ParamRef]
-    listToParamRefs list =
-      mapMaybe (view maybe'paramRef) (view items list)
+    listToParamRefs lst =
+      mapMaybe (view maybe'paramRef) (view items lst)
 
     resTargetToParameters :: ResTarget -> [QueryParameter]
     resTargetToParameters target =

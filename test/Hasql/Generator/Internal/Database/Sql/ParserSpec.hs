@@ -751,6 +751,25 @@ spec = do
         actual `shouldBe` expected
 
     describe "When given an insert statement" $ do
+      it "Parses the parameters from a query that has no joins" $ do
+        let query = "insert into users (use_2fa, email, phone, name) values (false, $1, null, $2) returning id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let expected =
+              nonEmpty
+                [ QueryParameter
+                    { parameterNumber = 1
+                    , parameterReference = "email"
+                    }
+                , QueryParameter
+                    { parameterNumber = 2
+                    , parameterReference = "name"
+                    }
+                ]
+            actual = sort <$> parseQueryParameters result
+
+        actual `shouldBe` expected
+
       it "Parses the parameters from join clauses and where clauses" $ do
         let query =
               " insert into users (name) \

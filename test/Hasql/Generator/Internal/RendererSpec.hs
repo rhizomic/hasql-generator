@@ -1,11 +1,11 @@
-module Hasql.Generator.Internal.Renderer2Spec (spec) where
+module Hasql.Generator.Internal.RendererSpec (spec) where
 
 import Data.ByteString (ByteString)
 import Data.Function (($))
 import Data.Maybe (Maybe (Just, Nothing))
 import Data.String (String)
 import Data.Text (Text, unpack)
-import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
+import Hasql.Generator.Internal.Database.Sql.Analysis.Types
   ( ColumnMetadata (ColumnMetadata, columnNullConstraint, columnType),
     NullabilityConstraint (NotNull, Null),
     PostgresqlParameterAndResultMetadata
@@ -16,7 +16,7 @@ import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
       ),
     PostgresqlType (PgText, PgUuid),
   )
-import Hasql.Generator.Internal.Renderer2 (toHaskell)
+import Hasql.Generator.Internal.Renderer (toHaskell)
 import Test.Hspec
   ( Spec,
     describe,

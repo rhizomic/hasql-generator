@@ -1,4 +1,4 @@
-module Hasql.Generator.Internal.Database.Sql.Analysis2.Types
+module Hasql.Generator.Internal.Database.Sql.Analysis.Types
   ( PostgresqlType (..),
     NullabilityConstraint (..),
     TableName (..),

@@ -1,4 +1,4 @@
-module Hasql.Generator.Internal.Database.Sql.Parser2.Types
+module Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( ColumnReference (..),
     PostgresqlExpression (..),
     PostgresqlJoinType (..),

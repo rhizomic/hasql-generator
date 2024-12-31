@@ -1,4 +1,4 @@
-module Hasql.Generator.Internal.Renderer2
+module Hasql.Generator.Internal.Renderer
   ( toHaskell,
   )
 where
@@ -16,7 +16,7 @@ import Data.Monoid ((<>))
 import Data.Text (Text, append, elem, intercalate, pack, replicate, unwords)
 import Data.Tuple (fst, snd)
 import GHC.Show (show)
-import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
+import Hasql.Generator.Internal.Database.Sql.Analysis.Types
   ( ColumnMetadata (columnNullConstraint, columnType),
     NullabilityConstraint (NotNull, Null),
     PostgresqlParameterAndResultMetadata (parameterMetadata, resultLimit, resultMetadata),

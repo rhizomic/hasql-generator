@@ -1,20 +1,20 @@
 {-# OPTIONS_GHC -Wno-missing-local-signatures #-}
 {-# OPTIONS_GHC -Wno-monomorphism-restriction #-}
 
-module Hasql.Generator.Internal.Database.Sql.Parser2Spec (spec) where
+module Hasql.Generator.Internal.Database.Sql.ParserSpec (spec) where
 
 import Data.Function (($))
 import Data.Functor ((<$>))
 import Data.List.NonEmpty (nonEmpty, sort)
 import Data.Maybe (Maybe (Just, Nothing))
 import Data.Text (unpack)
-import Hasql.Generator.Internal.Database.Sql.Parser2
+import Hasql.Generator.Internal.Database.Sql.Parser
   ( parseLimit,
     parseQueryParameters,
     parseQueryResults,
     parseTableRelations,
   )
-import Hasql.Generator.Internal.Database.Sql.Parser2.Types
+import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( JoinInformation (JoinInformation, joinType, tableAndAlias),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin),
     QueryParameter (QueryParameter, parameterNumber, parameterReference),

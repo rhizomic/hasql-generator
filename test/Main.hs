@@ -9,10 +9,10 @@ import Data.Text (unpack)
 import Data.Traversable (mapM)
 import GHC.Err (error)
 import Hasql.Generator.Internal.Database (withDb)
-import Hasql.Generator.Internal.Database.Sql.Parser2Spec qualified as Parser2Spec
+import Hasql.Generator.Internal.Database.Sql.ParserSpec qualified as ParserSpec
 import Hasql.Generator.Internal.Database.Transaction (paramAndResultlessTransaction, runTransaction)
 import Hasql.Generator.Internal.DatabaseSpec qualified as DatabaseSpec
-import Hasql.Generator.Internal.Renderer2Spec qualified as Renderer2Spec
+import Hasql.Generator.Internal.RendererSpec qualified as RendererSpec
 import Hasql.GeneratorSpec qualified as GeneratorSpec
 import Hasql.Pool (Pool, use)
 import System.IO (IO)
@@ -25,11 +25,9 @@ main :: IO ()
 main = do
   withMigratedDb $ \pool ->
     hspec $ do
-      -- describe "Parser" ParserSpec.spec
-      describe "Parser2" Parser2Spec.spec
+      describe "Parser" ParserSpec.spec
       describe "Database" $ DatabaseSpec.spec pool
-      -- describe "Renderer" RendererSpec.spec
-      describe "Renderer2" Renderer2Spec.spec
+      describe "Renderer" RendererSpec.spec
       describe "Generator" GeneratorSpec.spec
 
 withMigratedDb ::

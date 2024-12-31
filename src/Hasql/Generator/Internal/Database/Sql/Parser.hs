@@ -1,4 +1,4 @@
-module Hasql.Generator.Internal.Database.Sql.Parser2
+module Hasql.Generator.Internal.Database.Sql.Parser
   ( parseLimit,
     parseQueryParameters,
     parseQueryResults,
@@ -26,7 +26,7 @@ import Data.Maybe
 import Data.Monoid ((<>))
 import Data.Text (Text, intercalate)
 import GHC.Real (fromIntegral)
-import Hasql.Generator.Internal.Database.Sql.Parser2.Types
+import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( JoinInformation (JoinInformation, joinType, tableAndAlias),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin, RightJoin),
     QueryParameter (QueryParameter, parameterNumber, parameterReference),

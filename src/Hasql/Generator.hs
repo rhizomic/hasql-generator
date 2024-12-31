@@ -21,7 +21,7 @@ import GHC.Show (Show (show))
 import Hasql.Generator.Internal.Database (withDb)
 import Hasql.Generator.Internal.Database.Sql (parameterAndResultMetadata)
 import Hasql.Generator.Internal.Database.Types (DatabaseSettings (host))
-import Hasql.Generator.Internal.Renderer2 (toHaskell)
+import Hasql.Generator.Internal.Renderer (toHaskell)
 import Hasql.Generator.Types
   ( QueryConfig
       ( functionName,

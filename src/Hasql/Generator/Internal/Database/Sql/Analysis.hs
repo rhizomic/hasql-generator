@@ -1,4 +1,4 @@
-module Hasql.Generator.Internal.Database.Sql.Analysis2
+module Hasql.Generator.Internal.Database.Sql.Analysis
   ( getParameterAndResultMetadata,
   )
 where
@@ -22,7 +22,7 @@ import Hasql.Decoders (Result, column, rowList)
 import Hasql.Decoders qualified as Decoders (bool, nonNullable, text)
 import Hasql.Encoders (Params, param)
 import Hasql.Encoders qualified as Encoders (Value, array, dimension, element, nonNullable, text)
-import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
+import Hasql.Generator.Internal.Database.Sql.Analysis.Types
   ( ColumnMetadata (ColumnMetadata, columnNullConstraint, columnType),
     ColumnReferenceMetadata (ColumnReferenceMetadata, columnNullConstraint, columnReferences, columnType),
     ColumnTypeInformation
@@ -64,10 +64,10 @@ import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
       ),
     TableName (TableName),
   )
-import Hasql.Generator.Internal.Database.Sql.Analysis2.Types qualified as ColumnReferenceMetadata
+import Hasql.Generator.Internal.Database.Sql.Analysis.Types qualified as ColumnReferenceMetadata
   ( ColumnReferenceMetadata (columnNullConstraint),
   )
-import Hasql.Generator.Internal.Database.Sql.Parser2.Types
+import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( JoinInformation (joinType, tableAndAlias),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin, RightJoin),
     QueryParameter (parameterReference),

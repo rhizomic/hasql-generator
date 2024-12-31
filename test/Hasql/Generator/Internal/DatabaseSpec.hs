@@ -6,7 +6,7 @@ import Data.Maybe (Maybe (Nothing))
 import Hasql.Generator.Internal.Database.Sql
   ( parameterAndResultMetadata,
   )
-import Hasql.Generator.Internal.Database.Sql.Analysis2.Types
+import Hasql.Generator.Internal.Database.Sql.Analysis.Types
   ( ColumnMetadata (ColumnMetadata, columnNullConstraint, columnType),
     NullabilityConstraint (NotNull, Null),
     PostgresqlParameterAndResultMetadata

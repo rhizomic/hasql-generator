@@ -13,7 +13,7 @@ import Data.Functor (fmap, (<$>))
 import Data.Int (Int)
 import Data.List (concat, filter, unsnoc, (++))
 import Data.List.NonEmpty (NonEmpty, fromList, toList)
-import Data.Map.Strict (Map, fromListWith, (!))
+import Data.Map.Strict (Map, fromListWith, lookup)
 import Data.Maybe (Maybe (Just, Nothing), maybe)
 import Data.Monoid ((<>))
 import Data.Text (Text, unpack)
@@ -145,9 +145,8 @@ getColumnReferenceMetadata tableRelations = do
       (TableRelation, [ColumnReferenceMetadata])
     toTableRelationAndColumnReferenceMetadata allTypeInformation tableRelation =
       let tableName = tableRelationToTableName tableRelation
-          -- TODO: Defend the use of `!` or use something like 'lookup' instead
-          tableTypeInformation = allTypeInformation ! tableName
-          columnReferenceMetadata = fmap toColumnReferenceMetadata tableTypeInformation
+          mTableTypeInformation = lookup tableName allTypeInformation
+          columnReferenceMetadata = maybe [] (fmap toColumnReferenceMetadata) mTableTypeInformation
        in (tableRelation, columnReferenceMetadata)
       where
         toColumnReferenceMetadata ::

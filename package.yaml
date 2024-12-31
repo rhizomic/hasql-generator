@@ -127,7 +127,7 @@ library:
   source-dirs: src
   when:
   - condition: false
-    other-modules: Paths_hasql-generator
+    other-modules: Paths_hasql_generator
   extra-libraries:
   - pg_query
 

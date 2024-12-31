@@ -25,8 +25,6 @@ library
       Hasql.Generator.Internal.Database.Types
       Hasql.Generator.Internal.Renderer
       Hasql.Generator.Types
-  other-modules:
-      Paths_hasql_generator
   hs-source-dirs:
       src
   default-extensions:

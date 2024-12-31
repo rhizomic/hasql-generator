@@ -93,9 +93,6 @@
           ## Haskell formatter
           hspkgs.fourmolu
 
-          ## ghciwatch
-          unstablePkgs.ghciwatch
-
           ## HLS
           (pkgs.haskell-language-server.override {supportedGhcVersions = ["982"];})
 

@@ -1,29 +1,29 @@
 # hasql-generator
 
-This library generates Haskell code for interfacing with Hasql. It abstracts 
+This library generates Haskell code for interfacing with Hasql. It abstracts
 the tedium of having to manually write and maintain Hasql codecs.
 
 ## Motivation
 
-1. [hasql](https://hackage.haskell.org/package/hasql) is a wonderful library, 
-   but writing encoders and decoders for every query quickly grows tiresome. 
-   For projects with more than a few queries, using the base package just isn't 
+1. [hasql](https://hackage.haskell.org/package/hasql) is a wonderful library,
+   but writing encoders and decoders for every query quickly grows tiresome.
+   For projects with more than a few queries, using the base package just isn't
    feasible.
-2. While [hasql-th](https://hackage.haskell.org/package/hasql-th) eliminates 
+2. While [hasql-th](https://hackage.haskell.org/package/hasql-th) eliminates
    the need to deal with codecs, users are still forced to annotate the types
    and nullability constraints in their queries. Because the code has no
    knowledge of the underlying schema, these annotations can lead to bugs if
    the schema changs.
 3. Another downside to `hasql-th` is that the queries themselves need to be
-   written in (Template) Haskell, which means that users lose the benefit of 
+   written in (Template) Haskell, which means that users lose the benefit of
    SQL syntax highlighting.
 
 This library was written to solve all of the above pain points:
 
 1. Codecs are now auto-generated.
-2. The generated code takes the underlying schema into account. This includes 
+2. The generated code takes the underlying schema into account. This includes
    both types _and_ nullability constraints.
-3. All application queries can be written in standalone SQL files. No Template 
+3. All application queries can be written in standalone SQL files. No Template
    Haskell is required at all.
 
 ## Example
@@ -140,7 +140,7 @@ import Hasql.Generator.Types (QueryConfig (..))
 generateCodecs :: IO (Either (NonEmpty (Text, QueryConfig)) ())
 generateCodecs = do
   let migrationFiles = ["path/to/migration1.sql", "path/to/migration2.sql"]
-      queryConfigs = fromList 
+      queryConfigs = fromList
         [ QueryConfig
           { inputFile = "path/to/query_to_get_user_info.sql"
           , outputLocation = "path/to/QueryToGetUserInfo.hs"
@@ -155,9 +155,9 @@ generateCodecs = do
 ## Known Issues
 
 This library should not be used in production yet. The biggest issue is that
-this library currently relies on the (largely undocumented) output from 
+this library currently relies on the (largely undocumented) output from
 `explain verbose` to obtain the query parameters and results. There are plenty
-of queries where parameter and result detection fails. This library will need 
+of queries where parameter and result detection fails. This library will need
 to properly parse the text of queries before it can be considered stable/usable.
 
 ## Development
@@ -166,12 +166,6 @@ to properly parse the text of queries before it can be considered stable/usable.
 
 ```
 make build
-```
-
-### Iterative Feedback
-
-```
-make ghciwatch
 ```
 
 ### Testing

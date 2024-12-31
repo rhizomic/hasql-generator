@@ -16,20 +16,13 @@ library
       Hasql.Generator
       Hasql.Generator.Internal.Database
       Hasql.Generator.Internal.Database.Sql
-      Hasql.Generator.Internal.Database.Sql.Analysis
       Hasql.Generator.Internal.Database.Sql.Analysis2
       Hasql.Generator.Internal.Database.Sql.Analysis2.Types
-      Hasql.Generator.Internal.Database.Sql.Parser
-      Hasql.Generator.Internal.Database.Sql.Parser.Types
       Hasql.Generator.Internal.Database.Sql.Parser2
       Hasql.Generator.Internal.Database.Sql.Parser2.Types
-      Hasql.Generator.Internal.Database.Sql.PreparedStatement
-      Hasql.Generator.Internal.Database.Sql.Types
       Hasql.Generator.Internal.Database.Statement
       Hasql.Generator.Internal.Database.Transaction
       Hasql.Generator.Internal.Database.Types
-      Hasql.Generator.Internal.Renderer
-      Hasql.Generator.Internal.Renderer.Types
       Hasql.Generator.Internal.Renderer2
       Hasql.Generator.Types
   other-modules:
@@ -101,10 +94,8 @@ test-suite hasql-generator-test
   main-is: Main.hs
   other-modules:
       Hasql.Generator.Internal.Database.Sql.Parser2Spec
-      Hasql.Generator.Internal.Database.Sql.ParserSpec
       Hasql.Generator.Internal.DatabaseSpec
       Hasql.Generator.Internal.Renderer2Spec
-      Hasql.Generator.Internal.RendererSpec
       Hasql.GeneratorSpec
       TestImport.Assertions
       TestImport.Migrations

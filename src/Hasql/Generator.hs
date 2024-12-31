@@ -20,10 +20,6 @@ import GHC.IO (IO)
 import GHC.Show (Show (show))
 import Hasql.Generator.Internal.Database (withDb)
 import Hasql.Generator.Internal.Database.Sql (parameterAndResultMetadata)
-import Hasql.Generator.Internal.Database.Sql.Analysis2 (getParameterAndResultMetadata)
-import Hasql.Generator.Internal.Database.Sql.Parser (parseLimit)
-import Hasql.Generator.Internal.Database.Sql.Parser2 (parseQueryParameters, parseQueryResults, parseTableRelations)
-import Hasql.Generator.Internal.Database.Transaction (runTransaction)
 import Hasql.Generator.Internal.Database.Types (DatabaseSettings (host))
 import Hasql.Generator.Internal.Renderer2 (toHaskell)
 import Hasql.Generator.Types
@@ -34,8 +30,7 @@ import Hasql.Generator.Types
         outputLocation
       ),
   )
-import Hasql.Pool (Pool, use)
-import PgQuery (parseSql)
+import Hasql.Pool (Pool)
 import System.IO (FilePath)
 import System.Process.Typed
   ( ExitCode,

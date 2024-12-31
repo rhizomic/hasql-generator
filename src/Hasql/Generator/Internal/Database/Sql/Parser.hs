@@ -61,8 +61,7 @@ import PgQuery
         Node'ColumnRef,
         Node'List,
         Node'ParamRef,
-        Node'ResTarget,
-        Node'SubLink
+        Node'ResTarget
       ),
     ParamRef,
     ParseResult,
@@ -72,11 +71,9 @@ import PgQuery
     UpdateStmt,
     aliasname,
     args,
-    deleteStmt,
     fields,
     fromClause,
     indirection,
-    insertStmt,
     items,
     ival,
     joinExpr,
@@ -110,10 +107,8 @@ import PgQuery
     selectStmt,
     stmt,
     stmts,
-    subselect,
     sval,
     targetList,
-    updateStmt,
     usingClause,
     whereClause,
   )
@@ -134,36 +129,64 @@ parseQueryParameters ::
   ParseResult ->
   Maybe (NonEmpty QueryParameter)
 parseQueryParameters result =
-  let statements = toListOf (stmts . traverse . stmt) result
-   in nonEmpty . sort $ nodesToParameters statements
+  let allStatements = toListOf (stmts . traverse . stmt) result
+      results = case nonEmpty allStatements of
+        Just statements -> sort . nodesToParameters $ head statements
+        Nothing -> []
+   in nonEmpty results
   where
-    nodesToParameters :: [Node] -> [QueryParameter]
-    nodesToParameters [] = []
-    nodesToParameters statements =
-      let selectStatements = fmap (view selectStmt) statements
-          selectFromClauses = view (traverse . fromClause) selectStatements
-          selectWhereClauses = fmap (view whereClause) selectStatements
+    nodesToParameters :: Node -> [QueryParameter]
+    nodesToParameters statement =
+      let mSelectStatement = view maybe'selectStmt statement
+          selectParameters = maybe [] getParametersFromSelect mSelectStatement
 
-          updateStatements = fmap (view updateStmt) statements
-          updateTargetList = view (traverse . targetList) updateStatements
-          updateFromClauses = view (traverse . fromClause) updateStatements
-          updateWhereClauses = fmap (view whereClause) updateStatements
+          mDeleteStatement = view maybe'deleteStmt statement
+          deleteParameters = maybe [] getParametersFromDelete mDeleteStatement
 
-          deleteStatements = fmap (view deleteStmt) statements
-          deleteUsingClauses = view (traverse . usingClause) deleteStatements
-          deleteWhereClauses = fmap (view whereClause) deleteStatements
+          mUpdateStatement = view maybe'updateStmt statement
+          updateParameters = maybe [] getParametersFromUpdate mUpdateStatement
 
-          insertStatements = fmap (view insertStmt) statements
-          insertSelectStatements = fmap (view (selectStmt . selectStmt)) insertStatements
-          insertSelectFromClauses = view (traverse . fromClause) insertSelectStatements
-          insertSelectWhereClauses = fmap (view whereClause) insertSelectStatements
+          mInsertStatement = view maybe'insertStmt statement
+          insertParameters = maybe [] getParametersFromInsert mInsertStatement
+       in selectParameters ++ deleteParameters ++ updateParameters ++ insertParameters
+      where
+        getParametersFromSelect :: SelectStmt -> [QueryParameter]
+        getParametersFromSelect selectStatement =
+          let selectWhereClause = view whereClause selectStatement
 
-          joinClauses =
-            fmap
-              (view (joinExpr . quals))
-              (selectFromClauses ++ updateFromClauses ++ deleteUsingClauses ++ insertSelectFromClauses)
-          whereClauses = selectWhereClauses ++ updateWhereClauses ++ deleteWhereClauses ++ insertSelectWhereClauses
-       in concatMap nodeToParameters (updateTargetList ++ joinClauses ++ whereClauses)
+              selectFromClauses = view fromClause selectStatement
+              joinClauses = fmap (view (joinExpr . quals)) selectFromClauses
+           in concatMap nodeToParameters (selectWhereClause : joinClauses)
+
+        getParametersFromDelete :: DeleteStmt -> [QueryParameter]
+        getParametersFromDelete deleteStatement =
+          let deleteWhereClause = view whereClause deleteStatement
+
+              deleteUsingClauses = view usingClause deleteStatement
+              joinClauses = fmap (view (joinExpr . quals)) deleteUsingClauses
+           in concatMap nodeToParameters (deleteWhereClause : joinClauses)
+
+        getParametersFromUpdate :: UpdateStmt -> [QueryParameter]
+        getParametersFromUpdate updateStatement =
+          let updateWhereClause = view whereClause updateStatement
+              updateTargetList = view targetList updateStatement
+
+              updateFromClauses = view fromClause updateStatement
+              joinClauses = fmap (view (joinExpr . quals)) updateFromClauses
+           in concatMap nodeToParameters (updateWhereClause : (updateTargetList ++ joinClauses))
+
+        getParametersFromInsert :: InsertStmt -> [QueryParameter]
+        getParametersFromInsert insertStatement =
+          let insertSelectStatement = view (selectStmt . selectStmt) insertStatement
+
+              insertSelectWhereClause = view whereClause insertSelectStatement
+
+              insertSelectFromClauses = view fromClause insertSelectStatement
+              joinClauses =
+                fmap
+                  (view (joinExpr . quals))
+                  insertSelectFromClauses
+           in concatMap nodeToParameters (insertSelectWhereClause : joinClauses)
 
     nodeToParameters :: Node -> [QueryParameter]
     nodeToParameters subNode =
@@ -175,8 +198,6 @@ parseQueryParameters result =
           aExprToParameters expr
         Just (Node'ResTarget target) ->
           resTargetToParameters target
-        Just (Node'SubLink subLink) ->
-          nodesToParameters $ toListOf subselect subLink
         _ -> []
 
     aExprToParameters :: A_Expr -> [QueryParameter]

@@ -154,11 +154,8 @@ generateCodecs = do
 
 ## Known Issues
 
-This library should not be used in production yet. The biggest issue is that
-this library currently relies on the (largely undocumented) output from
-`explain verbose` to obtain the query parameters and results. There are plenty
-of queries where parameter and result detection fails. This library will need
-to properly parse the text of queries before it can be considered stable/usable.
+There is currently no support for subqueries nor CTEs. Support for them may
+be added at a later time.
 
 ## Development
 

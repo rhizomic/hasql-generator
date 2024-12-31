@@ -70,7 +70,9 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
       [(PostgresqlType, NullabilityConstraint)] ->
       Text
     haskellOutput parameterTypes resultTypes =
-      (moduleDeclaration <> "\n")
+      "{-# OPTIONS_GHC -Wno-unused-imports #-}\n"
+        <> "\n"
+        <> (moduleDeclaration <> "\n")
         <> (imports parameterTypes resultTypes (limit /= Just 1) <> "\n")
         <> "\n"
         <> functionNameAndTypeSignature 2 parameterTypes resultTypes

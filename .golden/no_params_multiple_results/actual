@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 module SelectIdLine1AndLine2FromAddresses
   (query)
 where

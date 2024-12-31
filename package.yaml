@@ -53,9 +53,6 @@ ghc-options:
   - -Wno-unticked-promoted-constructors # Richard Eisenberg (the author of -Wunticked-promoted-constructors) says it's a misfeature: https://mail.haskell.org/pipermail/haskell-cafe/2021-October/134748.html
 
 dependencies:
-  # Fast JSON parsing and encoding
-  - aeson
-
   # Haskell's base library, containing core types, data structures, and the
   # Prelude
   - base
@@ -66,20 +63,11 @@ dependencies:
   # Assorted concrete container types
   - containers
 
-  # Extras for the "contravariant" package
-  - contravariant-extras
-
   # Platform-agnostic library for filesystem operations
   - directory
 
-  # Extensible optionally-pure exceptions
-  - exceptions
-
   # A library of extra functions for the standard Haskell libraries
   - extra
-
-  # Library for manipulating FilePaths in a cross platform way
-  - filepath
 
   # PostgreSQL driver
   - hasql >= 1.8
@@ -99,12 +87,6 @@ dependencies:
   # Parse PostgreSQL DDL and DML: Haskell bindings for libpg_query
   - pg-query
 
-  # PostgreSQL AST parsing and rendering
-  - postgresql-syntax
-
-  # A regex library on top of pcre-light
-  - pcre-heavy
-
   # Portable temporary file and directory support
   - temporary
 
@@ -113,12 +95,6 @@ dependencies:
 
   # Run external processes/commands
   - typed-process
-
-  # The MonadUnliftIO typeclass for unlifting monads to IO
-  - unliftio-core
-
-  # Efficient Arrays
-  - vector
 
 # hpack defaults this to Haskell2010 if not specified.
 language: GHC2021
@@ -141,6 +117,9 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - hasql-generator
+
+    # Library for manipulating FilePaths in a cross platform way
+    - filepath
 
     # Testing framework
     - hspec

@@ -302,6 +302,7 @@ imports ::
   Text
 imports parameterTypesAndConstraints resultTypesAndConstraints includeVector =
   intercalate "\n"
+    . nubOrd
     . sort
     $ baseImports <> libImports <> typeImports <> contrazipImports
   where
@@ -329,10 +330,9 @@ imports parameterTypesAndConstraints resultTypesAndConstraints includeVector =
 
     typeImports :: [Text]
     typeImports =
-      nubOrd $
-        mapMaybe
-          (postgresqlTypeToImport . fst)
-          (parameterTypesAndConstraints ++ resultTypesAndConstraints)
+      mapMaybe
+        (postgresqlTypeToImport . fst)
+        (parameterTypesAndConstraints ++ resultTypesAndConstraints)
 
     contrazipImports :: [Text]
     contrazipImports =

@@ -31,7 +31,7 @@ query a1 a2 a3 =
 
   where
     sql :: ByteString
-    sql = "select id, line_1, line_2 from addresses where city = $1 or postal_code = $2 or country = $3;"
+    sql = "select id, line_1, line_2 from addresses where city = $1 or postal_code = $2 or country = $3 limit 5;"
 
     params :: (Text, Text, Text)
     params = (a1, a2, a3)

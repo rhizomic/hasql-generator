@@ -16,7 +16,7 @@ import Hasql.Generator.Internal.Database.Sql.Analysis.Types
     PostgresqlType (PgText, PgUuid),
   )
 import Hasql.Generator.Internal.Database.Sql.Parser.Types
-  ( NumberOfRowsReturned (AtMostOne, None, Unknown),
+  ( NumberOfRowsReturned (AtMostMoreThanOne, AtMostOne, ExactlyOne, None, Unknown),
   )
 import Hasql.Generator.Internal.Renderer (toHaskell)
 import Test.Hspec
@@ -208,7 +208,7 @@ spec = do
       shouldBeGolden "multiple_params_one_result" actual
 
     it "renders the expected code when the metadata consists of multiple params and multiple results" $ do
-      let sql :: ByteString = "select id, line_1, line_2 from addresses where city = $1 or postal_code = $2 or country = $3;"
+      let sql :: ByteString = "select id, line_1, line_2 from addresses where city = $1 or postal_code = $2 or country = $3 limit 5;"
           parameterAndResultMetadata =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
@@ -239,12 +239,39 @@ spec = do
                       , columnNullConstraint = Null
                       }
                   ]
-              , numberOfRowsReturned = Unknown
+              , numberOfRowsReturned = AtMostMoreThanOne
               }
 
           actual = toHaskell sql parameterAndResultMetadata "SelectIdLine1AndLine2FromAddressesByCityPostalCodeOrCountry" "query"
 
       shouldBeGolden "multiple_params_multiple_results" actual
+
+    it "renders the expected code when the metadata consists of multiple params and one result and only one returned row is expected" $ do
+      let sql :: ByteString = "insert into users (email, name) values ($1, $2) returning id"
+          parameterAndResultMetadata =
+            PostgresqlParameterAndResultMetadata
+              { parameterMetadata =
+                  [ ColumnMetadata
+                      { columnType = PgText
+                      , columnNullConstraint = NotNull
+                      }
+                  , ColumnMetadata
+                      { columnType = PgText
+                      , columnNullConstraint = NotNull
+                      }
+                  ]
+              , resultMetadata =
+                  [ ColumnMetadata
+                      { columnType = PgUuid
+                      , columnNullConstraint = NotNull
+                      }
+                  ]
+              , numberOfRowsReturned = ExactlyOne
+              }
+
+          actual = toHaskell sql parameterAndResultMetadata "InsertUser" "query"
+
+      shouldBeGolden "multiple_params_one_result_one_returned_row" actual
 
 shouldBeGolden ::
   String ->

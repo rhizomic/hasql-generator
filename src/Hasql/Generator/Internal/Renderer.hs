@@ -6,7 +6,6 @@ where
 import Data.Bool (Bool (False, True))
 import Data.ByteString (ByteString)
 import Data.Containers.ListUtils (nubOrd)
-import Data.Eq (Eq ((/=)))
 import Data.Function (($), (.))
 import Data.Functor (fmap)
 import Data.Int (Int)
@@ -19,7 +18,7 @@ import GHC.Show (show)
 import Hasql.Generator.Internal.Database.Sql.Analysis.Types
   ( ColumnMetadata (columnNullConstraint, columnType),
     NullabilityConstraint (NotNull, Null),
-    PostgresqlParameterAndResultMetadata (parameterMetadata, resultLimit, resultMetadata),
+    PostgresqlParameterAndResultMetadata (numberOfRowsReturned, parameterMetadata, resultMetadata),
     PostgresqlType
       ( PgBool,
         PgBytea,
@@ -44,6 +43,9 @@ import Hasql.Generator.Internal.Database.Sql.Analysis.Types
         PgUuid
       ),
   )
+import Hasql.Generator.Internal.Database.Sql.Parser.Types
+  ( NumberOfRowsReturned (AtMostMoreThanOne, AtMostOne, ExactlyOne, None, Unknown),
+  )
 
 toHaskell ::
   ByteString ->
@@ -56,8 +58,8 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
     (fmap columnMetadataToTuple parameterAndResultMetadata.parameterMetadata)
     (fmap columnMetadataToTuple parameterAndResultMetadata.resultMetadata)
   where
-    limit :: Maybe Int
-    limit = parameterAndResultMetadata.resultLimit
+    numberOfRowsReturned :: NumberOfRowsReturned
+    numberOfRowsReturned = parameterAndResultMetadata.numberOfRowsReturned
 
     columnMetadataToTuple ::
       ColumnMetadata ->
@@ -73,7 +75,7 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
       "{-# OPTIONS_GHC -Wno-unused-imports #-}\n"
         <> "\n"
         <> (moduleDeclaration <> "\n")
-        <> (imports parameterTypes resultTypes (limit /= Just 1) <> "\n")
+        <> (imports parameterTypes resultTypes numberOfRowsReturned <> "\n")
         <> "\n"
         <> functionNameAndTypeSignature 2 parameterTypes resultTypes
         <> "\n"
@@ -118,7 +120,7 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
 
         formattedResultTypes :: Text
         formattedResultTypes =
-          pad paddingAmount <> resultTypeSignature resultTypes limit "Transaction"
+          pad paddingAmount <> resultTypeSignature resultTypes numberOfRowsReturned "Transaction"
 
     identifierNames ::
       [(PostgresqlType, NullabilityConstraint)] ->
@@ -243,21 +245,24 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
         <> decoderBody
       where
         decoderTypeSignature :: Text
-        decoderTypeSignature = resultTypeSignature resultTypes limit "Decoders.Result"
+        decoderTypeSignature = resultTypeSignature resultTypes numberOfRowsReturned "Decoders.Result"
 
         decoderBody :: Text
         decoderBody =
           case resultTypes of
             [] ->
-              pad 6 <> "Decoders.noResult"
+              pad 6
+                <> resultFunction
             [pgTypeAndConstraint] ->
               pad 6
                 <> resultFunction
+                <> " $\n"
                 <> pad 8
                 <> toResult pgTypeAndConstraint
             (firstTypeAndConstraint : remainingTypesAndConstraints) ->
               pad 6
                 <> resultFunction
+                <> " $\n"
                 <> pad 8
                 <> "("
                 <> replicate (length remainingTypesAndConstraints) ","
@@ -271,9 +276,12 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
           where
             resultFunction :: Text
             resultFunction =
-              case limit of
-                Just 1 -> "Decoders.rowMaybe $\n"
-                _ -> "Decoders.rowVector $\n"
+              case numberOfRowsReturned of
+                ExactlyOne -> "Decoders.singleRow"
+                AtMostOne -> "Decoders.rowMaybe"
+                None -> "Decoders.noResult"
+                AtMostMoreThanOne -> "Decoders.rowVector"
+                Unknown -> "Decoders.rowVector"
 
             toResult ::
               (PostgresqlType, NullabilityConstraint) ->
@@ -298,9 +306,9 @@ pad amount = replicate amount " "
 imports ::
   [(PostgresqlType, NullabilityConstraint)] ->
   [(PostgresqlType, NullabilityConstraint)] ->
-  Bool ->
+  NumberOfRowsReturned ->
   Text
-imports parameterTypesAndConstraints resultTypesAndConstraints includeVector =
+imports parameterTypesAndConstraints resultTypesAndConstraints numberOfRowsReturned =
   intercalate "\n"
     . nubOrd
     . sort
@@ -318,7 +326,7 @@ imports parameterTypesAndConstraints resultTypesAndConstraints includeVector =
 
     libImports :: [Text]
     libImports =
-      let vectorImport = case includeVector of
+      let vectorImport :: [Text] = case includeVector of
             True -> ["import Data.Vector (Vector)"]
             False -> []
        in vectorImport
@@ -327,6 +335,14 @@ imports parameterTypesAndConstraints resultTypesAndConstraints includeVector =
                , "import Hasql.Statement (Statement (Statement))"
                , "import Hasql.Transaction (Transaction, statement)"
                ]
+      where
+        includeVector :: Bool
+        includeVector = case numberOfRowsReturned of
+          ExactlyOne -> False
+          AtMostOne -> False
+          None -> False
+          AtMostMoreThanOne -> True
+          Unknown -> True
 
     typeImports :: [Text]
     typeImports =
@@ -354,23 +370,31 @@ postgresqlTypeAndNullabilityConstraintToHaskellType (pgType, constraint) =
 
 resultTypeSignature ::
   [(PostgresqlType, NullabilityConstraint)] ->
-  Maybe Int ->
+  NumberOfRowsReturned ->
   Text ->
   Text
-resultTypeSignature resultTypes limit outerType =
-  case (resultTypes, limit) of
-    ([], _) -> outerType <> " ()"
-    (_, Just 1) ->
+resultTypeSignature resultTypes numberOfRowsReturned outerType =
+  case numberOfRowsReturned of
+    None -> outerType <> " ()"
+    AtMostMoreThanOne -> multipleResultType
+    Unknown -> multipleResultType
+    ExactlyOne ->
+      case ' ' `elem` innerTypes of
+        True -> outerType <> " (" <> innerTypes <> ")"
+        False -> outerType <> " " <> innerTypes
+    AtMostOne ->
       case ' ' `elem` innerTypes of
         True -> outerType <> " (Maybe (" <> innerTypes <> "))"
         False -> outerType <> " (Maybe " <> innerTypes <> ")"
-    (_, _) ->
-      case ' ' `elem` innerTypes of
-        True -> outerType <> " (Vector (" <> innerTypes <> "))"
-        False -> outerType <> " (Vector " <> innerTypes <> ")"
   where
     innerTypes :: Text
     innerTypes = intercalate ", " (fmap postgresqlTypeAndNullabilityConstraintToHaskellType resultTypes)
+
+    multipleResultType :: Text
+    multipleResultType =
+      case ' ' `elem` innerTypes of
+        True -> outerType <> " (Vector (" <> innerTypes <> "))"
+        False -> outerType <> " (Vector " <> innerTypes <> ")"
 
 -- https://hackage.haskell.org/package/hasql-1.8.0.1/docs/Hasql-Decoders.html
 postgresqlTypeToHaskellType ::

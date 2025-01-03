@@ -9,13 +9,14 @@ import Data.List.NonEmpty (nonEmpty, sort)
 import Data.Maybe (Maybe (Just, Nothing))
 import Data.Text (unpack)
 import Hasql.Generator.Internal.Database.Sql.Parser
-  ( parseLimit,
+  ( parseNumberOfRowsReturned,
     parseQueryParameters,
     parseQueryResults,
     parseTableRelations,
   )
 import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( JoinInformation (JoinInformation, joinType, tableAndAlias),
+    NumberOfRowsReturned (AtMostMoreThanOne, AtMostOne, ExactlyOne, None, Unknown),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin),
     QueryParameter (QueryParameter, parameterNumber, parameterReference),
     QueryResult (QueryResult),
@@ -562,33 +563,100 @@ spec = do
 
         actual `shouldBe` expected
 
-  describe "parseLimit" do
-    it "returns the correct results for a query that has no specified limit" $ do
-      let query = "select * from users"
-      result <- assertRight <$> parseSql (unpack query)
+  describe "parseNumberOfRowsReturned" do
+    describe "When given a select statement" $ do
+      it "returns the correct results for a query that has no specified limit" $ do
+        let query = "select * from users"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseLimit result
-          expected = Nothing
+        let actual = parseNumberOfRowsReturned result
+            expected = Unknown
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
 
-    it "returns the correct results for a query that has a specified limit" $ do
-      let query = "select * from users join addresses a on users.id = addresses.user_id limit 5"
-      result <- assertRight <$> parseSql (unpack query)
+      it "returns the correct results for a query that has a specified limit" $ do
+        let query = "select * from users join addresses a on users.id = addresses.user_id limit 5"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseLimit result
-          expected = Just 5
+        let actual = parseNumberOfRowsReturned result
+            expected = AtMostMoreThanOne
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
 
-    it "returns the correct results for a query that has a specified limit of 1" $ do
-      let query = "select * from users limit 1"
-      result <- assertRight <$> parseSql (unpack query)
+      it "returns the correct results for a query that has a specified limit of 1" $ do
+        let query = "select * from users limit 1"
+        result <- assertRight <$> parseSql (unpack query)
 
-      let actual = parseLimit result
-          expected = Just 1
+        let actual = parseNumberOfRowsReturned result
+            expected = AtMostOne
 
-      actual `shouldBe` expected
+        actual `shouldBe` expected
+
+    describe "When given a delete statement" $ do
+      it "returns the correct results for a query that doesn't return anything" $ do
+        let query = "delete from users"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseNumberOfRowsReturned result
+            expected = None
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that returns something" $ do
+        let query = "delete from users returning id, email"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseNumberOfRowsReturned result
+            expected = Unknown
+
+        actual `shouldBe` expected
+
+    describe "When given an update statement" $ do
+      it "returns the correct results for a query that doesn't return anything" $ do
+        let query = "update users set name = $1"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseNumberOfRowsReturned result
+            expected = None
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that returns something" $ do
+        let query = "update users set name = $1 returning id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseNumberOfRowsReturned result
+            expected = Unknown
+
+        actual `shouldBe` expected
+
+    describe "When given an insert statement" $ do
+      it "returns the correct results for a query that inserts a single row" $ do
+        let query = "insert into users (email, name) values ($1, $2) returning id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseNumberOfRowsReturned result
+            expected = ExactlyOne
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that inserts multiple rows" $ do
+        let query = "insert into users (email, name) values ($1, $2), ($3, $4) returning id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseNumberOfRowsReturned result
+            expected = AtMostMoreThanOne
+
+        actual `shouldBe` expected
+
+      it "returns the correct results for a query that can end up inserting no rows" $ do
+        let query = "insert into users (email, name) select email, name from users returning id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let actual = parseNumberOfRowsReturned result
+            expected = Unknown
+
+        actual `shouldBe` expected
 
   describe "parseQueryParameters" do
     it "Parses no parameters from a query that lacks parameters" $ do

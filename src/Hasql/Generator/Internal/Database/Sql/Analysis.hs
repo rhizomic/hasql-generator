@@ -10,7 +10,6 @@ import Data.Coerce (coerce)
 import Data.Foldable (elem, foldl')
 import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
-import Data.Int (Int)
 import Data.List (concat, filter, unsnoc, (++))
 import Data.List.NonEmpty (NonEmpty, fromList, toList)
 import Data.Map.Strict (Map, fromListWith, lookup)
@@ -35,8 +34,8 @@ import Hasql.Generator.Internal.Database.Sql.Analysis.Types
     NullabilityConstraint (NotNull, Null),
     PostgresqlParameterAndResultMetadata
       ( PostgresqlParameterAndResultMetadata,
+        numberOfRowsReturned,
         parameterMetadata,
-        resultLimit,
         resultMetadata
       ),
     PostgresqlType
@@ -69,6 +68,7 @@ import Hasql.Generator.Internal.Database.Sql.Analysis.Types qualified as ColumnR
   )
 import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( JoinInformation (joinType, tableAndAlias),
+    NumberOfRowsReturned,
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin, RightJoin),
     QueryParameter (parameterReference),
     QueryResult (QueryResult),
@@ -79,12 +79,12 @@ import Hasql.Generator.Internal.Database.Transaction (transaction)
 import Hasql.Transaction (Transaction)
 
 getParameterAndResultMetadata ::
-  Maybe Int ->
   Maybe (NonEmpty TableRelation) ->
   Maybe (NonEmpty QueryParameter) ->
   Maybe (NonEmpty QueryResult) ->
+  NumberOfRowsReturned ->
   Transaction PostgresqlParameterAndResultMetadata
-getParameterAndResultMetadata mResultLimit mTableRelations mParameters mResults = do
+getParameterAndResultMetadata mTableRelations mParameters mResults numberOfRowsReturned = do
   columnReferenceMetadata <- maybe (pure []) getColumnReferenceMetadata mTableRelations
 
   let toColumnMetadata = referenceToColumnMetadata columnReferenceMetadata
@@ -95,7 +95,7 @@ getParameterAndResultMetadata mResultLimit mTableRelations mParameters mResults 
     PostgresqlParameterAndResultMetadata
       { parameterMetadata = fmap toColumnMetadata parameters
       , resultMetadata = fmap toColumnMetadata results
-      , resultLimit = mResultLimit
+      , numberOfRowsReturned = numberOfRowsReturned
       }
   where
     referenceToColumnMetadata ::

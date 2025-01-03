@@ -5,6 +5,7 @@ module Hasql.Generator.Internal.Database.Sql.Parser.Types
     TableRelation (..),
     QueryParameter (..),
     QueryResult (..),
+    NumberOfRowsReturned (..),
   )
 where
 
@@ -53,3 +54,18 @@ instance Ord QueryParameter where
 
 newtype QueryResult = QueryResult Text
   deriving newtype (Show, Eq)
+
+-- | The number of rows returned by a query.
+data NumberOfRowsReturned
+  = -- | Exactly one row is returned. This is most common with an INSERT
+    --   statement.
+    ExactlyOne
+  | -- | Either zero or one rows are returned.
+    AtMostOne
+  | -- | Zero, one, or more rows are returned.
+    AtMostMoreThanOne
+  | -- | Zero rows are returned.
+    None
+  | -- | Nothing in the query indicated how many rows would be returned.
+    Unknown
+  deriving stock (Show, Eq)

@@ -27,7 +27,7 @@ query a1 =
 
   where
     sql :: ByteString
-    sql = "select line_1 from addresses a where a.user_id = $1;"
+    sql = "select line_1 from addresses a where a.user_id = $1 limit 1;"
 
     params :: UUID
     params = a1

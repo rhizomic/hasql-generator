@@ -2,7 +2,6 @@ module Hasql.Generator.Internal.DatabaseSpec (spec) where
 
 import Data.ByteString (readFile)
 import Data.Either (Either (Right))
-import Data.Maybe (Maybe (Nothing))
 import Hasql.Generator.Internal.Database.Sql
   ( parameterAndResultMetadata,
   )
@@ -11,11 +10,14 @@ import Hasql.Generator.Internal.Database.Sql.Analysis.Types
     NullabilityConstraint (NotNull, Null),
     PostgresqlParameterAndResultMetadata
       ( PostgresqlParameterAndResultMetadata,
+        numberOfRowsReturned,
         parameterMetadata,
-        resultLimit,
         resultMetadata
       ),
     PostgresqlType (PgText, PgTimestamptz, PgUuid),
+  )
+import Hasql.Generator.Internal.Database.Sql.Parser.Types
+  ( NumberOfRowsReturned (Unknown),
   )
 import Hasql.Pool (Pool)
 import Test.Hspec
@@ -63,7 +65,7 @@ spec pool =
                       , columnNullConstraint = NotNull
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
       results `shouldBe` Right expected
@@ -91,7 +93,7 @@ spec pool =
                       , columnNullConstraint = NotNull
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
       results `shouldBe` Right expected
@@ -119,7 +121,7 @@ spec pool =
                       , columnNullConstraint = NotNull
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
       results `shouldBe` Right expected
@@ -154,7 +156,7 @@ spec pool =
                       , columnNullConstraint = NotNull
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
       results `shouldBe` Right expected
@@ -194,7 +196,7 @@ spec pool =
                       , columnNullConstraint = NotNull
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
       results `shouldBe` Right expected
@@ -225,7 +227,7 @@ spec pool =
                       , columnNullConstraint = Null
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
       results `shouldBe` Right expected
@@ -252,7 +254,7 @@ spec pool =
                       , columnNullConstraint = Null
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
       results `shouldBe` Right expected
@@ -274,7 +276,7 @@ spec pool =
                       , columnNullConstraint = NotNull
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
       results `shouldBe` Right expected
@@ -305,7 +307,7 @@ spec pool =
                       , columnNullConstraint = Null
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
       results `shouldBe` Right expected

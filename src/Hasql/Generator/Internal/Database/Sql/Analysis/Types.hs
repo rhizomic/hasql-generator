@@ -10,12 +10,11 @@ module Hasql.Generator.Internal.Database.Sql.Analysis.Types
 where
 
 import Data.Eq (Eq)
-import Data.Int (Int)
 import Data.List.NonEmpty (NonEmpty)
-import Data.Maybe (Maybe)
 import Data.Ord (Ord)
 import Data.Text (Text)
 import GHC.Show (Show)
+import Hasql.Generator.Internal.Database.Sql.Parser.Types (NumberOfRowsReturned)
 
 -- | Primitive types in Postgresql which also have representation within Hasql.
 --
@@ -116,7 +115,7 @@ data PostgresqlParameterAndResultMetadata = PostgresqlParameterAndResultMetadata
   -- ^ The metadata for the query parameters.
   , resultMetadata :: [ColumnMetadata]
   -- ^ The metadata for the query results.
-  , resultLimit :: Maybe Int
-  -- ^ The limit on the number of results returned by the query.
+  , numberOfRowsReturned :: NumberOfRowsReturned
+  -- ^ The number of rows returned by the query.
   }
   deriving stock (Show, Eq)

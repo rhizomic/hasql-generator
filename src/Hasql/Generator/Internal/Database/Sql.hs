@@ -14,7 +14,7 @@ import GHC.IO (IO)
 import GHC.Show (show)
 import Hasql.Generator.Internal.Database.Sql.Analysis (getParameterAndResultMetadata)
 import Hasql.Generator.Internal.Database.Sql.Analysis.Types (PostgresqlParameterAndResultMetadata)
-import Hasql.Generator.Internal.Database.Sql.Parser (parseLimit, parseQueryParameters, parseQueryResults, parseTableRelations)
+import Hasql.Generator.Internal.Database.Sql.Parser (parseNumberOfRowsReturned, parseQueryParameters, parseQueryResults, parseTableRelations)
 import Hasql.Generator.Internal.Database.Transaction (runTransaction)
 import Hasql.Pool (Pool, use)
 import PgQuery (parseSql)
@@ -30,17 +30,17 @@ parameterAndResultMetadata pool sql = do
     Left err ->
       pure . Left $ pack err
     Right parseResult -> do
-      let mLimit = parseLimit parseResult
-          mTableRelations = parseTableRelations parseResult
+      let mTableRelations = parseTableRelations parseResult
           mQueryParameters = parseQueryParameters parseResult
           mQueryResults = parseQueryResults parseResult
+          numberOfRowsReturned = parseNumberOfRowsReturned parseResult
 
       eMetadata <-
         use pool . runTransaction $
           getParameterAndResultMetadata
-            mLimit
             mTableRelations
             mQueryParameters
             mQueryResults
+            numberOfRowsReturned
 
       pure $ mapLeft (pack . show) eMetadata

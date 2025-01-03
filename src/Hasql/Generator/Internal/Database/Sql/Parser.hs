@@ -1,5 +1,5 @@
 module Hasql.Generator.Internal.Database.Sql.Parser
-  ( parseLimit,
+  ( parseNumberOfRowsReturned,
     parseQueryParameters,
     parseQueryResults,
     parseTableRelations,
@@ -9,7 +9,7 @@ where
 import Control.Lens (toListOf, traverse, view)
 import Control.Monad ((=<<))
 import Data.Bool (Bool (False, True))
-import Data.Foldable (concatMap)
+import Data.Foldable (concatMap, length)
 import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
 import Data.Int (Int)
@@ -18,7 +18,6 @@ import Data.List.NonEmpty (NonEmpty, head, nonEmpty)
 import Data.Maybe
   ( Maybe (Just, Nothing),
     catMaybes,
-    listToMaybe,
     mapMaybe,
     maybe,
     maybeToList,
@@ -28,6 +27,7 @@ import Data.Text (Text, intercalate)
 import GHC.Real (fromIntegral)
 import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( JoinInformation (JoinInformation, joinType, tableAndAlias),
+    NumberOfRowsReturned (AtMostMoreThanOne, AtMostOne, ExactlyOne, None, Unknown),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin, RightJoin),
     QueryParameter (QueryParameter, parameterNumber, parameterReference),
     QueryResult (QueryResult),
@@ -80,7 +80,6 @@ import PgQuery
     joinExpr,
     jointype,
     larg,
-    limitCount,
     list,
     maybe'aConst,
     maybe'alias,
@@ -90,6 +89,7 @@ import PgQuery
     maybe'ival,
     maybe'joinExpr,
     maybe'lexpr,
+    maybe'limitCount,
     maybe'node,
     maybe'paramRef,
     maybe'rexpr,
@@ -116,27 +116,76 @@ import PgQuery
     whereClause,
   )
 
-parseLimit ::
+parseNumberOfRowsReturned ::
   ParseResult ->
-  Maybe Int
-parseLimit result =
-  let mLimitNode = listToMaybe $ toListOf (stmts . traverse . stmt . selectStmt . limitCount) result
-   in nodeToConstInteger =<< mLimitNode
+  NumberOfRowsReturned
+parseNumberOfRowsReturned result =
+  let allStatements = toListOf (stmts . traverse . stmt) result
+   in case nonEmpty allStatements of
+        Just statements -> nodeToNumberOfRowsReturned $ head statements
+        Nothing -> Unknown
   where
-    nodeToConstInteger :: Node -> Maybe Int
-    nodeToConstInteger subNode =
-      fromIntegral . view ival
-        <$> (view maybe'ival =<< view maybe'aConst subNode)
+    nodeToNumberOfRowsReturned :: Node -> NumberOfRowsReturned
+    nodeToNumberOfRowsReturned statement =
+      case (view maybe'selectStmt statement, view maybe'deleteStmt statement, view maybe'updateStmt statement, view maybe'insertStmt statement) of
+        (Just selectStatement, _, _, _) -> getNumberOfRowsReturnedFromSelect selectStatement
+        (Nothing, Just deleteStatement, _, _) -> getNumberOfRowsReturnedFromDelete deleteStatement
+        (Nothing, Nothing, Just updateStatement, _) -> getNumberOfRowsReturnedFromUpdate updateStatement
+        (Nothing, Nothing, Nothing, Just insertStatement) -> getNumberOfRowsReturnedFromInsert insertStatement
+        _ -> Unknown
+      where
+        getNumberOfRowsReturnedFromSelect :: SelectStmt -> NumberOfRowsReturned
+        getNumberOfRowsReturnedFromSelect selectStatement =
+          let mLimitNode = view maybe'limitCount selectStatement
+           in case nodeToConstInteger =<< mLimitNode of
+                Nothing -> Unknown
+                Just 0 -> None
+                Just 1 -> AtMostOne
+                _ -> AtMostMoreThanOne
+          where
+            nodeToConstInteger :: Node -> Maybe Int
+            nodeToConstInteger subNode =
+              fromIntegral . view ival
+                <$> (view maybe'ival =<< view maybe'aConst subNode)
+
+        getNumberOfRowsReturnedFromDelete :: DeleteStmt -> NumberOfRowsReturned
+        getNumberOfRowsReturnedFromDelete deleteStatement =
+          let returningLists = view returningList deleteStatement
+           in case length returningLists of
+                0 -> None
+                _ -> Unknown
+
+        getNumberOfRowsReturnedFromUpdate :: UpdateStmt -> NumberOfRowsReturned
+        getNumberOfRowsReturnedFromUpdate updateStatement =
+          let returningLists = view returningList updateStatement
+           in case length returningLists of
+                0 -> None
+                _ -> Unknown
+
+        getNumberOfRowsReturnedFromInsert :: InsertStmt -> NumberOfRowsReturned
+        getNumberOfRowsReturnedFromInsert insertStatement =
+          let insertSelectStatement = view (selectStmt . selectStmt) insertStatement
+              insertValueLists = view valuesLists insertSelectStatement
+           in case length insertValueLists of
+                0 ->
+                  -- We use 'Unknown' here because inserting with "VALUES ..."
+                  -- is only one of several ways of inserting data. It's
+                  -- possible for an insert statement to insert no rows at all.
+                  Unknown
+                1 ->
+                  ExactlyOne
+                _ ->
+                  AtMostMoreThanOne
 
 parseQueryParameters ::
   ParseResult ->
   Maybe (NonEmpty QueryParameter)
 parseQueryParameters result =
   let allStatements = toListOf (stmts . traverse . stmt) result
-      results = case nonEmpty allStatements of
+      parameters = case nonEmpty allStatements of
         Just statements -> sort . nodesToParameters $ head statements
         Nothing -> []
-   in nonEmpty results
+   in nonEmpty parameters
   where
     nodesToParameters :: Node -> [QueryParameter]
     nodesToParameters statement =

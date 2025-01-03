@@ -2,7 +2,6 @@ module Hasql.Generator.Internal.RendererSpec (spec) where
 
 import Data.ByteString (ByteString)
 import Data.Function (($))
-import Data.Maybe (Maybe (Just, Nothing))
 import Data.String (String)
 import Data.Text (Text, unpack)
 import Hasql.Generator.Internal.Database.Sql.Analysis.Types
@@ -10,11 +9,14 @@ import Hasql.Generator.Internal.Database.Sql.Analysis.Types
     NullabilityConstraint (NotNull, Null),
     PostgresqlParameterAndResultMetadata
       ( PostgresqlParameterAndResultMetadata,
+        numberOfRowsReturned,
         parameterMetadata,
-        resultLimit,
         resultMetadata
       ),
     PostgresqlType (PgText, PgUuid),
+  )
+import Hasql.Generator.Internal.Database.Sql.Parser.Types
+  ( NumberOfRowsReturned (AtMostOne, None, Unknown),
   )
 import Hasql.Generator.Internal.Renderer (toHaskell)
 import Test.Hspec
@@ -33,7 +35,7 @@ spec = do
             PostgresqlParameterAndResultMetadata
               { parameterMetadata = []
               , resultMetadata = []
-              , resultLimit = Nothing
+              , numberOfRowsReturned = None
               }
 
           actual = toHaskell sql parameterAndResultMetadata "DeleteFromAddresses" "query"
@@ -51,7 +53,7 @@ spec = do
                       , columnNullConstraint = NotNull
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
           actual = toHaskell sql parameterAndResultMetadata "SelectIdFromAddresses" "query"
@@ -77,7 +79,7 @@ spec = do
                       , columnNullConstraint = Null
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
           actual = toHaskell sql parameterAndResultMetadata "SelectIdLine1AndLine2FromAddresses" "query"
@@ -95,7 +97,7 @@ spec = do
                       }
                   ]
               , resultMetadata = []
-              , resultLimit = Nothing
+              , numberOfRowsReturned = None
               }
 
           actual = toHaskell sql parameterAndResultMetadata "UpdateAddresses" "query"
@@ -103,7 +105,7 @@ spec = do
       shouldBeGolden "one_param_no_results" actual
 
     it "renders the expected code when the metadata consists of one param and one result" $ do
-      let sql :: ByteString = "select line_1 from addresses a where a.user_id = $1;"
+      let sql :: ByteString = "select line_1 from addresses a where a.user_id = $1 limit 1;"
           parameterAndResultMetadata =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
@@ -118,7 +120,7 @@ spec = do
                       , columnNullConstraint = NotNull
                       }
                   ]
-              , resultLimit = Just 1
+              , numberOfRowsReturned = AtMostOne
               }
 
           actual = toHaskell sql parameterAndResultMetadata "GetLine1Address" "query"
@@ -149,7 +151,7 @@ spec = do
                       , columnNullConstraint = NotNull
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
           actual = toHaskell sql parameterAndResultMetadata "SelectIdPostalCodeAndCountryFromAddresses" "query"
@@ -171,7 +173,7 @@ spec = do
                       }
                   ]
               , resultMetadata = []
-              , resultLimit = Nothing
+              , numberOfRowsReturned = None
               }
 
           actual = toHaskell sql parameterAndResultMetadata "DeleteFromAddressesByPostalCodeAndCountry" "query"
@@ -198,7 +200,7 @@ spec = do
                       , columnNullConstraint = NotNull
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
           actual = toHaskell sql parameterAndResultMetadata "SelectIdFromAddressesByUserIdAndCity" "query"
@@ -237,7 +239,7 @@ spec = do
                       , columnNullConstraint = Null
                       }
                   ]
-              , resultLimit = Nothing
+              , numberOfRowsReturned = Unknown
               }
 
           actual = toHaskell sql parameterAndResultMetadata "SelectIdLine1AndLine2FromAddressesByCityPostalCodeOrCountry" "query"

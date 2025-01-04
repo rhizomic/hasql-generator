@@ -319,6 +319,7 @@ imports parameterTypesAndConstraints resultTypesAndConstraints numberOfRowsRetur
       [ "import Control.Applicative ((<*>))"
       , "import Data.Bool (Bool (True))"
       , "import Data.ByteString (ByteString)"
+      , "import Data.Either (Either (Right))" -- for handling Decoders.custom
       , "import Data.Function (($))"
       , "import Data.Functor ((<$>))"
       , "import Data.Maybe (Maybe)"

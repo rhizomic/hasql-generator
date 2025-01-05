@@ -7,11 +7,11 @@ import Data.Bool (Bool (False, True))
 import Data.ByteString (ByteString)
 import Data.Containers.ListUtils (nubOrd)
 import Data.Function (($), (.))
-import Data.Functor (fmap, (<$>))
+import Data.Functor (fmap)
 import Data.Int (Int)
-import Data.List (length, null, sort, zip, (++))
+import Data.List (concatMap, length, null, sort, zip, (++))
 import Data.Map.Strict (Map, lookup)
-import Data.Maybe (Maybe (Just, Nothing), mapMaybe)
+import Data.Maybe (Maybe (Just, Nothing), maybe)
 import Data.Monoid ((<>))
 import Data.Text (Text, append, elem, intercalate, pack, replicate, unwords)
 import Data.Tuple (fst, snd)
@@ -235,7 +235,7 @@ toHaskell sql parameterAndResultMetadata moduleName functionName enumConfigs =
                     <> "Encoders.param $ "
                     <> nullabilityConstraintToNullableEncoder (snd pgTypeAndConstraint)
                     <> " "
-                    <> postgresqlTypeToEncoder enumConfigs (fst pgTypeAndConstraint)
+                    <> postgresqlTypeToEncoder (fst pgTypeAndConstraint)
                     <> suffix
 
             nullabilityConstraintToNullableEncoder ::
@@ -301,7 +301,7 @@ toHaskell sql parameterAndResultMetadata moduleName functionName enumConfigs =
               "Decoders.column ("
                 <> nullabilityConstraintToNullableDecoder (snd pgTypeAndConstraint)
                 <> " "
-                <> postgresqlTypeToDecoder enumConfigs (fst pgTypeAndConstraint)
+                <> postgresqlTypeToDecoder (fst pgTypeAndConstraint)
                 <> ")"
 
             nullabilityConstraintToNullableDecoder ::
@@ -359,8 +359,8 @@ imports enumConfigs parameterTypesAndConstraints resultTypesAndConstraints numbe
 
     typeImports :: [Text]
     typeImports =
-      mapMaybe
-        (postgresqlTypeToImport enumConfigs . fst)
+      concatMap
+        (postgresqlTypeToImports enumConfigs . fst)
         (parameterTypesAndConstraints ++ resultTypesAndConstraints)
 
     contrazipImports :: [Text]
@@ -444,44 +444,45 @@ postgresqlTypeToHaskellType enumConfigs = \case
   PgUnknown unknown -> unknown
 
 -- https://hackage.haskell.org/package/hasql-1.8.0.1/docs/Hasql-Decoders.html
-postgresqlTypeToImport ::
+postgresqlTypeToImports ::
   Map Text EnumConfig ->
   PostgresqlType ->
-  Maybe Text
-postgresqlTypeToImport enumConfigs = \case
-  PgBool -> Just "import Data.Bool (Bool)"
-  PgInt2 -> Just "import Data.Int (Int16)"
-  PgInt4 -> Just "import Data.Int (Int32)"
-  PgInt8 -> Just "import Data.Int (Int64)"
-  PgFloat4 -> Just "import GHC.Float (Float)"
-  PgFloat8 -> Just "import GHC.Float (Double)"
-  PgNumeric -> Just "import Data.Scientific (Scientific)"
-  PgChar -> Just "import Data.Char (Char)"
-  PgText -> Just "import Data.Text (Text)"
-  PgBytea -> Just "import Data.ByteString (ByteString)" -- strict
-  PgDate -> Just "import Data.Time.Calendar.OrdinalDate (Day)"
-  PgTimestamp -> Just "import Data.Time.LocalTime (LocalTime)"
-  PgTimestamptz -> Just "import Data.Time.Clock (UTCTime)"
-  PgTime -> Just "import Data.Time.LocalTime (TimeOfDay)"
-  PgTimetz -> Just "import Data.Time.LocalTime (TimeOfDay, TimeZone)"
-  PgInterval -> Just "import Data.Time.Clock (DiffTime)"
-  PgUuid -> Just "import Data.UUID (UUID)"
-  PgInet -> Just "import Data.IP (IPRange)"
-  PgJson -> Just "import Data.Aeson.Types (Value)"
-  PgJsonb -> Just "import Data.Aeson.Types (Value)"
-  PgEnum enum -> enumConfigToImport <$> lookup enum enumConfigs
-  PgUnknown _unknown -> Nothing
+  [Text]
+postgresqlTypeToImports enumConfigs = \case
+  PgBool -> ["import Data.Bool (Bool)"]
+  PgInt2 -> ["import Data.Int (Int16)"]
+  PgInt4 -> ["import Data.Int (Int32)"]
+  PgInt8 -> ["import Data.Int (Int64)"]
+  PgFloat4 -> ["import GHC.Float (Float)"]
+  PgFloat8 -> ["import GHC.Float (Double)"]
+  PgNumeric -> ["import Data.Scientific (Scientific)"]
+  PgChar -> ["import Data.Char (Char)"]
+  PgText -> ["import Data.Text (Text)"]
+  PgBytea -> ["import Data.ByteString (ByteString)"] -- strict
+  PgDate -> ["import Data.Time.Calendar.OrdinalDate (Day)"]
+  PgTimestamp -> ["import Data.Time.LocalTime (LocalTime)"]
+  PgTimestamptz -> ["import Data.Time.Clock (UTCTime)"]
+  PgTime -> ["import Data.Time.LocalTime (TimeOfDay)"]
+  PgTimetz -> ["import Data.Time.LocalTime (TimeOfDay, TimeZone)"]
+  PgInterval -> ["import Data.Time.Clock (DiffTime)"]
+  PgUuid -> ["import Data.UUID (UUID)"]
+  PgInet -> ["import Data.IP (IPRange)"]
+  PgJson -> ["import Data.Aeson.Types (Value)"]
+  PgJsonb -> ["import Data.Aeson.Types (Value)"]
+  PgEnum enum -> maybe [] enumConfigToImport (lookup enum enumConfigs)
+  PgUnknown _unknown -> []
   where
-    enumConfigToImport :: EnumConfig -> Text
+    enumConfigToImport :: EnumConfig -> [Text]
     enumConfigToImport config =
-      "import " <> config.moduleName <> " qualified (" <> config.haskellType <> ", hsToPg, pgToHs)"
+      [ "import " <> config.moduleName <> " (" <> config.haskellType <> ")"
+      , "import Hasql.Generator.Types (HasqlEnum (hsToPg, pgToHs))"
+      ]
 
 -- https://hackage.haskell.org/package/hasql-1.8.0.1/docs/Hasql-Encoders.html
 postgresqlTypeToEncoder ::
-  Map Text EnumConfig ->
   PostgresqlType ->
   Text
-postgresqlTypeToEncoder enumConfigs = \case
+postgresqlTypeToEncoder = \case
   PgBool -> "Encoders.bool"
   PgInt2 -> "Encoders.int2"
   PgInt4 -> "Encoders.int4"
@@ -502,18 +503,14 @@ postgresqlTypeToEncoder enumConfigs = \case
   PgInet -> "Encoders.inet"
   PgJson -> "Encoders.json"
   PgJsonb -> "Encoders.jsonb"
-  PgEnum enum ->
-    case lookup enum enumConfigs of
-      Nothing -> error $ "No EnumConfig found for `" <> show enum <> "`."
-      Just config -> "(Encoders.enum " <> config.moduleName <> ".hsToPg)"
+  PgEnum _enum -> "(Encoders.enum hsToPg)"
   PgUnknown _unknown -> "Encoders.unknown"
 
 -- https://hackage.haskell.org/package/hasql-1.8.0.1/docs/Hasql-Decoders.html
 postgresqlTypeToDecoder ::
-  Map Text EnumConfig ->
   PostgresqlType ->
   Text
-postgresqlTypeToDecoder enumConfigs = \case
+postgresqlTypeToDecoder = \case
   PgBool -> "Decoders.bool"
   PgInt2 -> "Decoders.int2"
   PgInt4 -> "Decoders.int4"
@@ -534,8 +531,5 @@ postgresqlTypeToDecoder enumConfigs = \case
   PgInet -> "Decoders.inet"
   PgJson -> "Decoders.json"
   PgJsonb -> "Decoders.jsonb"
-  PgEnum enum ->
-    case lookup enum enumConfigs of
-      Nothing -> error $ "No EnumConfig found for `" <> show enum <> "`."
-      Just config -> "(Decoders.enum " <> config.moduleName <> ".pgToHs)"
+  PgEnum _enum -> "(Decoders.enum pgToHs)"
   PgUnknown unknown -> "(Decoders.custom $ \\_ _ -> Right " <> pack (show unknown) <> ")"

@@ -37,7 +37,11 @@ data EnumConfig = EnumConfig
   }
   deriving stock (Show)
 
--- | TODO: Docs
+-- | 'HasqlEnum' is a typeclass used to serialize Haskell sum types into
+--   Postgres and deserialize Postgres enums back into Haskell.
+--
+--   Default implementations are provided for 'hsToPg' ('show') and
+--   'pgToHs' ('readMaybe').
 class HasqlEnum t where
   -- | Converts the Haskell enum into a PostgreSQL enum.
   hsToPg :: t -> Text

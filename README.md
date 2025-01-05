@@ -130,16 +130,19 @@ query a1 a2 =
 ## Usage
 
 In order for `hasql-generator` to have knowledge of your underlying schema, it
-will need to be given a full list of the database migrations.
+will need to be given a path to a dump of the schema. (The dump can be
+generated with `pg_dump`, e.g.,
+`pg_dump -U $DB_USER --no-owner --schema-only $DB_NAME > schema.sql`).
 
 ```hs
 import Data.List.NonEmpty (fromList)
+import Data.Map.Strict (empty)
 import Hasql.Generator (generate)
 import Hasql.Generator.Types (QueryConfig (..))
 
 generateCodecs :: IO (Either (NonEmpty (Text, QueryConfig)) ())
 generateCodecs = do
-  let migrationFiles = ["path/to/migration1.sql", "path/to/migration2.sql"]
+  let schemaFile = "path/to/schema.sql"
       queryConfigs = fromList
         [ QueryConfig
           { inputFile = "path/to/query_to_get_user_info.sql"
@@ -148,8 +151,83 @@ generateCodecs = do
           , functionName = "query"
           }
         ]
+      enumConfigs = empty
 
-  generate migrationFiles queryConfigs
+  generate migrationFiles queryConfigs enumConfigs
+```
+
+Handling PostgreSQL enums requires some additional setup. Given the following
+schema:
+
+```sql
+create type hobby as enum (
+  'Reading',
+  'Writing',
+  'PlayingSports'
+);
+
+create table users (
+  id uuid primary key unique default uuid_generate_v4(),
+  favorite_hobby hobby null,
+  name varchar not null
+);
+```
+
+You'd need to define the type in Haskell first:
+
+```
+module Example.Types
+  ( Hobby (..),
+  )
+where
+
+import GHC.Read (Read)
+import GHC.Show (Show)
+import Hasql.Generator.Types (HasqlEnum)
+
+data Hobby
+  = Reading
+  | Writing
+  | PlayingSports
+  deriving stock (Show, Read)
+
+instance HasqlEnum Hobby
+```
+
+Note that the type must be made an instance of `HasqlEnum`. You can rely on the
+default class definitions to serialize/deserialize values, or you can supply
+your own.
+
+Then it's just a matter of creating a `Map Text EnumConfig`, where the key is
+the name of the enum in PostgreSQL, the `moduleName` is the module where the
+type is defined, and `haskellType` is the name of the type:
+
+```hs
+import Data.List.NonEmpty (fromList)
+import Data.Map.Strict (empty)
+import Hasql.Generator (generate)
+import Hasql.Generator.Types (QueryConfig (..))
+
+generateCodecs :: IO (Either (NonEmpty (Text, QueryConfig)) ())
+generateCodecs = do
+  let schemaFile = "path/to/schema.sql"
+      queryConfigs = fromList
+        [ QueryConfig
+          { inputFile = "path/to/query_to_get_user_info.sql"
+          , outputLocation = "path/to/QueryToGetUserInfo.hs"
+          , moduleName = "QueryToGetUserInfo"
+          , functionName = "query"
+          }
+        ]
+      enumConfigs = Map.fromList
+        [ ( "hobby"
+          , EnumConfig
+            { moduleName = "Example.Types"
+            , haskellType = "Hobby"
+            }
+          )
+
+  generate migrationFiles queryConfigs enumConfigs
 ```
 
 ## Known Issues

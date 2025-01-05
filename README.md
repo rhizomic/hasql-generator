@@ -204,9 +204,10 @@ type is defined, and `haskellType` is the name of the type:
 
 ```hs
 import Data.List.NonEmpty (fromList)
-import Data.Map.Strict (empty)
+import Data.Map.Strict qualified as Map (Map, fromList)
+import Data.Text (Text)
 import Hasql.Generator (generate)
-import Hasql.Generator.Types (QueryConfig (..))
+import Hasql.Generator.Types (EnumConfig (..), QueryConfig (..))
 
 generateCodecs :: IO (Either (NonEmpty (Text, QueryConfig)) ())
 generateCodecs = do
@@ -219,7 +220,7 @@ generateCodecs = do
           , functionName = "query"
           }
         ]
-      enumConfigs = Map.fromList
+      enumConfigs :: Map.Map Text EnumConfig = Map.fromList
         [ ( "hobby"
           , EnumConfig
             { moduleName = "Example.Types"

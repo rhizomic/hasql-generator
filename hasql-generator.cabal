@@ -89,6 +89,7 @@ test-suite hasql-generator-test
       Hasql.GeneratorSpec
       TestImport.Assertions
       TestImport.Migrations
+      TestImport.Types
       Paths_hasql_generator
   hs-source-dirs:
       test

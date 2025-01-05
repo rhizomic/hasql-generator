@@ -1,5 +1,6 @@
 select
   u.name,
+  u.favorite_hobby,
   a.line_1,
   n.nickname
 from

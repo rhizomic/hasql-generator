@@ -5,16 +5,17 @@ import Data.Either (Either (Left, Right))
 import Data.Function (($), (.))
 import Data.Functor (fmap)
 import Data.List.NonEmpty (singleton, toList)
-import Data.Map.Strict (empty)
+import Data.Map.Strict qualified as Map (Map, fromList)
 import Data.Monoid ((<>))
 import Data.String (String)
-import Data.Text (intercalate, unpack)
+import Data.Text (Text, intercalate, unpack)
 import Data.Tuple (fst)
 import GHC.Base (error)
 import GHC.IO (IO)
 import Hasql.Generator (generate)
 import Hasql.Generator.Types
-  ( QueryConfig
+  ( EnumConfig (EnumConfig, haskellType, moduleName),
+    QueryConfig
       ( QueryConfig,
         functionName,
         inputFile,
@@ -56,7 +57,17 @@ testGeneratedCode inputFile = do
 
   withTempDirectory "." "hasql-generator-spec" $ \tmpDir -> do
     let queryConfig = toQueryConfig tmpDir inputFile
-    actual <- generate schemaFile (singleton queryConfig) empty
+        enumConfig :: Map.Map Text EnumConfig =
+          Map.fromList
+            [
+              ( "hobby"
+              , EnumConfig
+                  { moduleName = "TestImport.Types"
+                  , haskellType = "Hobby"
+                  }
+              )
+            ]
+    actual <- generate schemaFile (singleton queryConfig) enumConfig
     removeFile schemaFile
 
     case actual of

@@ -11,6 +11,7 @@ import Data.Eq ((==))
 import Data.Function (const, id, ($), (.))
 import Data.Functor (fmap)
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
+import Data.Map.Strict (Map)
 import Data.Maybe (Maybe (Just, Nothing), mapMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text, pack)
@@ -23,7 +24,8 @@ import Hasql.Generator.Internal.Database.Sql (parameterAndResultMetadata)
 import Hasql.Generator.Internal.Database.Types (DatabaseSettings (host))
 import Hasql.Generator.Internal.Renderer (toHaskell)
 import Hasql.Generator.Types
-  ( QueryConfig
+  ( EnumConfig,
+    QueryConfig
       ( functionName,
         inputFile,
         moduleName,
@@ -45,8 +47,9 @@ generate ::
   FilePath ->
   -- | The 'QueryConfig's to generate code for.
   NonEmpty QueryConfig ->
+  Map Text EnumConfig ->
   IO (Either (NonEmpty (Text, QueryConfig)) ())
-generate schemaFile queries = do
+generate schemaFile queries enumConfig = do
   eResult <- withDb $ \dbSettings pool -> do
     (_exitCode, _stdOut, stdErr) <- loadSchema dbSettings
 
@@ -94,7 +97,13 @@ generate schemaFile queries = do
                   <> err
            in pure $ Left (errorMessage, query)
         Right metadata -> do
-          let result = toHaskell sql metadata query.moduleName query.functionName
+          let result =
+                toHaskell
+                  sql
+                  metadata
+                  query.moduleName
+                  query.functionName
+                  enumConfig
           writeFile query.outputLocation result
           pure $ Right ()
 

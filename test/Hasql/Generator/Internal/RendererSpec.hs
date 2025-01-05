@@ -2,6 +2,7 @@ module Hasql.Generator.Internal.RendererSpec (spec) where
 
 import Data.ByteString (ByteString)
 import Data.Function (($))
+import Data.Map.Strict (empty)
 import Data.String (String)
 import Data.Text (Text, unpack)
 import Hasql.Generator.Internal.Database.Sql.Analysis.Types
@@ -38,7 +39,7 @@ spec = do
               , numberOfRowsReturned = None
               }
 
-          actual = toHaskell sql parameterAndResultMetadata "DeleteFromAddresses" "query"
+          actual = toHaskell sql parameterAndResultMetadata "DeleteFromAddresses" "query" empty
 
       shouldBeGolden "no_params_no_results" actual
 
@@ -56,7 +57,7 @@ spec = do
               , numberOfRowsReturned = Unknown
               }
 
-          actual = toHaskell sql parameterAndResultMetadata "SelectIdFromAddresses" "query"
+          actual = toHaskell sql parameterAndResultMetadata "SelectIdFromAddresses" "query" empty
 
       shouldBeGolden "no_params_one_result" actual
 
@@ -82,7 +83,7 @@ spec = do
               , numberOfRowsReturned = Unknown
               }
 
-          actual = toHaskell sql parameterAndResultMetadata "SelectIdLine1AndLine2FromAddresses" "query"
+          actual = toHaskell sql parameterAndResultMetadata "SelectIdLine1AndLine2FromAddresses" "query" empty
 
       shouldBeGolden "no_params_multiple_results" actual
 
@@ -100,7 +101,7 @@ spec = do
               , numberOfRowsReturned = None
               }
 
-          actual = toHaskell sql parameterAndResultMetadata "UpdateAddresses" "query"
+          actual = toHaskell sql parameterAndResultMetadata "UpdateAddresses" "query" empty
 
       shouldBeGolden "one_param_no_results" actual
 
@@ -123,7 +124,7 @@ spec = do
               , numberOfRowsReturned = AtMostOne
               }
 
-          actual = toHaskell sql parameterAndResultMetadata "GetLine1Address" "query"
+          actual = toHaskell sql parameterAndResultMetadata "GetLine1Address" "query" empty
 
       shouldBeGolden "one_param_one_result" actual
 
@@ -154,7 +155,7 @@ spec = do
               , numberOfRowsReturned = Unknown
               }
 
-          actual = toHaskell sql parameterAndResultMetadata "SelectIdPostalCodeAndCountryFromAddresses" "query"
+          actual = toHaskell sql parameterAndResultMetadata "SelectIdPostalCodeAndCountryFromAddresses" "query" empty
 
       shouldBeGolden "one_param_multiple_results" actual
 
@@ -176,7 +177,7 @@ spec = do
               , numberOfRowsReturned = None
               }
 
-          actual = toHaskell sql parameterAndResultMetadata "DeleteFromAddressesByPostalCodeAndCountry" "query"
+          actual = toHaskell sql parameterAndResultMetadata "DeleteFromAddressesByPostalCodeAndCountry" "query" empty
 
       shouldBeGolden "multiple_params_no_results" actual
 
@@ -203,7 +204,7 @@ spec = do
               , numberOfRowsReturned = Unknown
               }
 
-          actual = toHaskell sql parameterAndResultMetadata "SelectIdFromAddressesByUserIdAndCity" "query"
+          actual = toHaskell sql parameterAndResultMetadata "SelectIdFromAddressesByUserIdAndCity" "query" empty
 
       shouldBeGolden "multiple_params_one_result" actual
 
@@ -242,7 +243,7 @@ spec = do
               , numberOfRowsReturned = AtMostMoreThanOne
               }
 
-          actual = toHaskell sql parameterAndResultMetadata "SelectIdLine1AndLine2FromAddressesByCityPostalCodeOrCountry" "query"
+          actual = toHaskell sql parameterAndResultMetadata "SelectIdLine1AndLine2FromAddressesByCityPostalCodeOrCountry" "query" empty
 
       shouldBeGolden "multiple_params_multiple_results" actual
 
@@ -269,7 +270,7 @@ spec = do
               , numberOfRowsReturned = ExactlyOne
               }
 
-          actual = toHaskell sql parameterAndResultMetadata "InsertUser" "query"
+          actual = toHaskell sql parameterAndResultMetadata "InsertUser" "query" empty
 
       shouldBeGolden "multiple_params_one_result_one_returned_row" actual
 

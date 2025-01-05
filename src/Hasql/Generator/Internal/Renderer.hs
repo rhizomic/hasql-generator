@@ -7,13 +7,15 @@ import Data.Bool (Bool (False, True))
 import Data.ByteString (ByteString)
 import Data.Containers.ListUtils (nubOrd)
 import Data.Function (($), (.))
-import Data.Functor (fmap)
+import Data.Functor (fmap, (<$>))
 import Data.Int (Int)
 import Data.List (length, null, sort, zip, (++))
+import Data.Map.Strict (Map, lookup)
 import Data.Maybe (Maybe (Just, Nothing), mapMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text, append, elem, intercalate, pack, replicate, unwords)
 import Data.Tuple (fst, snd)
+import GHC.Err (error)
 import GHC.Show (show)
 import Hasql.Generator.Internal.Database.Sql.Analysis.Types
   ( ColumnMetadata (columnNullConstraint, columnType),
@@ -24,6 +26,7 @@ import Hasql.Generator.Internal.Database.Sql.Analysis.Types
         PgBytea,
         PgChar,
         PgDate,
+        PgEnum,
         PgFloat4,
         PgFloat8,
         PgInet,
@@ -44,16 +47,24 @@ import Hasql.Generator.Internal.Database.Sql.Analysis.Types
       ),
   )
 import Hasql.Generator.Internal.Database.Sql.Parser.Types
-  ( NumberOfRowsReturned (AtMostMoreThanOne, AtMostOne, ExactlyOne, None, Unknown),
+  ( NumberOfRowsReturned
+      ( AtMostMoreThanOne,
+        AtMostOne,
+        ExactlyOne,
+        None,
+        Unknown
+      ),
   )
+import Hasql.Generator.Types (EnumConfig (haskellType, moduleName))
 
 toHaskell ::
   ByteString ->
   PostgresqlParameterAndResultMetadata ->
   Text ->
   Text ->
+  Map Text EnumConfig ->
   Text
-toHaskell sql parameterAndResultMetadata moduleName functionName =
+toHaskell sql parameterAndResultMetadata moduleName functionName enumConfigs =
   haskellOutput
     (fmap columnMetadataToTuple parameterAndResultMetadata.parameterMetadata)
     (fmap columnMetadataToTuple parameterAndResultMetadata.resultMetadata)
@@ -75,7 +86,7 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
       "{-# OPTIONS_GHC -Wno-unused-imports #-}\n"
         <> "\n"
         <> (moduleDeclaration <> "\n")
-        <> (imports parameterTypes resultTypes numberOfRowsReturned <> "\n")
+        <> (imports enumConfigs parameterTypes resultTypes numberOfRowsReturned <> "\n")
         <> "\n"
         <> functionNameAndTypeSignature 2 parameterTypes resultTypes
         <> "\n"
@@ -114,13 +125,13 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
               let formatted =
                     intercalate " ->\n" $
                       fmap
-                        (append (pad paddingAmount) . postgresqlTypeAndNullabilityConstraintToHaskellType)
+                        (append (pad paddingAmount) . postgresqlTypeAndNullabilityConstraintToHaskellType enumConfigs)
                         parameterTypes
                in formatted <> " ->\n"
 
         formattedResultTypes :: Text
         formattedResultTypes =
-          pad paddingAmount <> resultTypeSignature resultTypes numberOfRowsReturned "Transaction"
+          pad paddingAmount <> resultTypeSignature enumConfigs resultTypes numberOfRowsReturned "Transaction"
 
     identifierNames ::
       [(PostgresqlType, NullabilityConstraint)] ->
@@ -160,13 +171,13 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
               \    params = ()"
             [(parameterType, identifierName)] ->
               "    params :: "
-                <> postgresqlTypeAndNullabilityConstraintToHaskellType parameterType
+                <> postgresqlTypeAndNullabilityConstraintToHaskellType enumConfigs parameterType
                 <> "\n\
                    \    params = "
                 <> identifierName
             _otherwise ->
               "    params :: ("
-                <> intercalate ", " (fmap postgresqlTypeAndNullabilityConstraintToHaskellType parameterTypes)
+                <> intercalate ", " (fmap (postgresqlTypeAndNullabilityConstraintToHaskellType enumConfigs) parameterTypes)
                 <> ")\n\
                    \    params = ("
                 <> intercalate ", " allIdentifierNames
@@ -188,12 +199,12 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
             [] ->
               "Encoders.Params ()"
             [pgTypeAndConstraint] ->
-              let haskellType = postgresqlTypeAndNullabilityConstraintToHaskellType pgTypeAndConstraint
+              let haskellType = postgresqlTypeAndNullabilityConstraintToHaskellType enumConfigs pgTypeAndConstraint
                in case ' ' `elem` haskellType of
                     True -> "Encoders.Params (" <> haskellType <> ")"
                     False -> "Encoders.Params " <> haskellType
             _otherwise ->
-              "Encoders.Params (" <> intercalate ", " (fmap postgresqlTypeAndNullabilityConstraintToHaskellType parameterTypes) <> ")"
+              "Encoders.Params (" <> intercalate ", " (fmap (postgresqlTypeAndNullabilityConstraintToHaskellType enumConfigs) parameterTypes) <> ")"
 
         encoderBody :: Text
         encoderBody =
@@ -224,7 +235,7 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
                     <> "Encoders.param $ "
                     <> nullabilityConstraintToNullableEncoder (snd pgTypeAndConstraint)
                     <> " "
-                    <> postgresqlTypeToEncoder (fst pgTypeAndConstraint)
+                    <> postgresqlTypeToEncoder enumConfigs (fst pgTypeAndConstraint)
                     <> suffix
 
             nullabilityConstraintToNullableEncoder ::
@@ -245,7 +256,7 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
         <> decoderBody
       where
         decoderTypeSignature :: Text
-        decoderTypeSignature = resultTypeSignature resultTypes numberOfRowsReturned "Decoders.Result"
+        decoderTypeSignature = resultTypeSignature enumConfigs resultTypes numberOfRowsReturned "Decoders.Result"
 
         decoderBody :: Text
         decoderBody =
@@ -290,7 +301,7 @@ toHaskell sql parameterAndResultMetadata moduleName functionName =
               "Decoders.column ("
                 <> nullabilityConstraintToNullableDecoder (snd pgTypeAndConstraint)
                 <> " "
-                <> postgresqlTypeToDecoder (fst pgTypeAndConstraint)
+                <> postgresqlTypeToDecoder enumConfigs (fst pgTypeAndConstraint)
                 <> ")"
 
             nullabilityConstraintToNullableDecoder ::
@@ -304,11 +315,12 @@ pad :: Int -> Text
 pad amount = replicate amount " "
 
 imports ::
+  Map Text EnumConfig ->
   [(PostgresqlType, NullabilityConstraint)] ->
   [(PostgresqlType, NullabilityConstraint)] ->
   NumberOfRowsReturned ->
   Text
-imports parameterTypesAndConstraints resultTypesAndConstraints numberOfRowsReturned =
+imports enumConfigs parameterTypesAndConstraints resultTypesAndConstraints numberOfRowsReturned =
   intercalate "\n"
     . nubOrd
     . sort
@@ -348,7 +360,7 @@ imports parameterTypesAndConstraints resultTypesAndConstraints numberOfRowsRetur
     typeImports :: [Text]
     typeImports =
       mapMaybe
-        (postgresqlTypeToImport . fst)
+        (postgresqlTypeToImport enumConfigs . fst)
         (parameterTypesAndConstraints ++ resultTypesAndConstraints)
 
     contrazipImports :: [Text]
@@ -359,10 +371,11 @@ imports parameterTypesAndConstraints resultTypesAndConstraints numberOfRowsRetur
         n -> ["import Contravariant.Extras (contrazip" <> pack (show n) <> ")"]
 
 postgresqlTypeAndNullabilityConstraintToHaskellType ::
+  Map Text EnumConfig ->
   (PostgresqlType, NullabilityConstraint) ->
   Text
-postgresqlTypeAndNullabilityConstraintToHaskellType (pgType, constraint) =
-  maybePrefix constraint <> postgresqlTypeToHaskellType pgType
+postgresqlTypeAndNullabilityConstraintToHaskellType enumConfigs (pgType, constraint) =
+  maybePrefix constraint <> postgresqlTypeToHaskellType enumConfigs pgType
   where
     maybePrefix :: NullabilityConstraint -> Text
     maybePrefix = \case
@@ -370,11 +383,12 @@ postgresqlTypeAndNullabilityConstraintToHaskellType (pgType, constraint) =
       Null -> "Maybe "
 
 resultTypeSignature ::
+  Map Text EnumConfig ->
   [(PostgresqlType, NullabilityConstraint)] ->
   NumberOfRowsReturned ->
   Text ->
   Text
-resultTypeSignature resultTypes numberOfRowsReturned outerType =
+resultTypeSignature enumConfigs resultTypes numberOfRowsReturned outerType =
   case numberOfRowsReturned of
     None -> outerType <> " ()"
     AtMostMoreThanOne -> multipleResultType
@@ -389,7 +403,7 @@ resultTypeSignature resultTypes numberOfRowsReturned outerType =
         False -> outerType <> " (Maybe " <> innerTypes <> ")"
   where
     innerTypes :: Text
-    innerTypes = intercalate ", " (fmap postgresqlTypeAndNullabilityConstraintToHaskellType resultTypes)
+    innerTypes = intercalate ", " (fmap (postgresqlTypeAndNullabilityConstraintToHaskellType enumConfigs) resultTypes)
 
     multipleResultType :: Text
     multipleResultType =
@@ -399,9 +413,10 @@ resultTypeSignature resultTypes numberOfRowsReturned outerType =
 
 -- https://hackage.haskell.org/package/hasql-1.8.0.1/docs/Hasql-Decoders.html
 postgresqlTypeToHaskellType ::
+  Map Text EnumConfig ->
   PostgresqlType ->
   Text
-postgresqlTypeToHaskellType = \case
+postgresqlTypeToHaskellType enumConfigs = \case
   PgBool -> "Bool"
   PgInt2 -> "Int16"
   PgInt4 -> "Int32"
@@ -422,13 +437,18 @@ postgresqlTypeToHaskellType = \case
   PgInet -> "IPRange"
   PgJson -> "Value"
   PgJsonb -> "Value"
+  PgEnum enum ->
+    case lookup enum enumConfigs of
+      Nothing -> error $ "No EnumConfig found for `" <> show enum <> "`."
+      Just config -> config.haskellType
   PgUnknown unknown -> unknown
 
 -- https://hackage.haskell.org/package/hasql-1.8.0.1/docs/Hasql-Decoders.html
 postgresqlTypeToImport ::
+  Map Text EnumConfig ->
   PostgresqlType ->
   Maybe Text
-postgresqlTypeToImport = \case
+postgresqlTypeToImport enumConfigs = \case
   PgBool -> Just "import Data.Bool (Bool)"
   PgInt2 -> Just "import Data.Int (Int16)"
   PgInt4 -> Just "import Data.Int (Int32)"
@@ -449,13 +469,19 @@ postgresqlTypeToImport = \case
   PgInet -> Just "import Data.IP (IPRange)"
   PgJson -> Just "import Data.Aeson.Types (Value)"
   PgJsonb -> Just "import Data.Aeson.Types (Value)"
+  PgEnum enum -> enumConfigToImport <$> lookup enum enumConfigs
   PgUnknown _unknown -> Nothing
+  where
+    enumConfigToImport :: EnumConfig -> Text
+    enumConfigToImport config =
+      "import " <> config.moduleName <> " qualified (" <> config.haskellType <> ", hsToPg, pgToHs)"
 
 -- https://hackage.haskell.org/package/hasql-1.8.0.1/docs/Hasql-Encoders.html
 postgresqlTypeToEncoder ::
+  Map Text EnumConfig ->
   PostgresqlType ->
   Text
-postgresqlTypeToEncoder = \case
+postgresqlTypeToEncoder enumConfigs = \case
   PgBool -> "Encoders.bool"
   PgInt2 -> "Encoders.int2"
   PgInt4 -> "Encoders.int4"
@@ -476,13 +502,18 @@ postgresqlTypeToEncoder = \case
   PgInet -> "Encoders.inet"
   PgJson -> "Encoders.json"
   PgJsonb -> "Encoders.jsonb"
+  PgEnum enum ->
+    case lookup enum enumConfigs of
+      Nothing -> error $ "No EnumConfig found for `" <> show enum <> "`."
+      Just config -> "(Encoders.enum " <> config.moduleName <> ".hsToPg)"
   PgUnknown _unknown -> "Encoders.unknown"
 
 -- https://hackage.haskell.org/package/hasql-1.8.0.1/docs/Hasql-Decoders.html
 postgresqlTypeToDecoder ::
+  Map Text EnumConfig ->
   PostgresqlType ->
   Text
-postgresqlTypeToDecoder = \case
+postgresqlTypeToDecoder enumConfigs = \case
   PgBool -> "Decoders.bool"
   PgInt2 -> "Decoders.int2"
   PgInt4 -> "Decoders.int4"
@@ -503,4 +534,8 @@ postgresqlTypeToDecoder = \case
   PgInet -> "Decoders.inet"
   PgJson -> "Decoders.json"
   PgJsonb -> "Decoders.jsonb"
+  PgEnum enum ->
+    case lookup enum enumConfigs of
+      Nothing -> error $ "No EnumConfig found for `" <> show enum <> "`."
+      Just config -> "(Decoders.enum " <> config.moduleName <> ".pgToHs)"
   PgUnknown unknown -> "(Decoders.custom $ \\_ _ -> Right " <> pack (show unknown) <> ")"

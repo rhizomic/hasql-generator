@@ -11,11 +11,11 @@ import Data.Foldable (elem, foldl')
 import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
 import Data.List (concat, filter, unsnoc, (++))
-import Data.List.NonEmpty (NonEmpty, fromList, toList)
+import Data.List.NonEmpty (NonEmpty ((:|)), fromList, nonEmpty, toList)
 import Data.Map.Strict (Map, fromListWith, lookup)
 import Data.Maybe (Maybe (Just, Nothing), maybe)
 import Data.Monoid ((<>))
-import Data.Text (Text, unpack)
+import Data.Text (Text, intercalate, splitOn, unpack)
 import GHC.Base (error)
 import Hasql.Decoders (Result, column, rowList)
 import Hasql.Decoders qualified as Decoders (bool, nonNullable, text)
@@ -43,6 +43,7 @@ import Hasql.Generator.Internal.Database.Sql.Analysis.Types
         PgBytea,
         PgChar,
         PgDate,
+        PgEnum,
         PgFloat4,
         PgFloat8,
         PgInet,
@@ -225,7 +226,7 @@ getColumnTypeInformation tableNames = do
         <> "  coalesce( "
         <> "    format_type(domain_type.typbasetype, domain_type.typtypmod), "
         <> "    case  "
-        <> "      when enum_type.oid is not null then 'enum' "
+        <> "      when enum_type.oid is not null then 'enum.' || format_type(pga.atttypid, pga.atttypmod) "
         <> "      else null "
         <> "    end,  "
         <> "    format_type(pga.atttypid, pga.atttypmod) "
@@ -343,4 +344,7 @@ textToPostgresqlType = \case
   --
   "jsonb" -> PgJsonb
   --
-  unknown -> PgUnknown unknown
+  unknown ->
+    case nonEmpty $ splitOn "." unknown of
+      Just ("enum" :| remaining) -> PgEnum $ intercalate "" remaining
+      _ -> PgUnknown unknown

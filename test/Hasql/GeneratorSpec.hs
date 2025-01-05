@@ -5,6 +5,7 @@ import Data.Either (Either (Left, Right))
 import Data.Function (($), (.))
 import Data.Functor (fmap)
 import Data.List.NonEmpty (singleton, toList)
+import Data.Map.Strict (empty)
 import Data.Monoid ((<>))
 import Data.String (String)
 import Data.Text (intercalate, unpack)
@@ -55,7 +56,7 @@ testGeneratedCode inputFile = do
 
   withTempDirectory "." "hasql-generator-spec" $ \tmpDir -> do
     let queryConfig = toQueryConfig tmpDir inputFile
-    actual <- generate schemaFile (singleton queryConfig)
+    actual <- generate schemaFile (singleton queryConfig) empty
     removeFile schemaFile
 
     case actual of

@@ -60,6 +60,8 @@ data PostgresqlType
     PgJson
   | -- | jsonb
     PgJsonb
+  | -- | enum
+    PgEnum Text
   | -- | Unknown
     PgUnknown Text
   deriving stock (Show, Eq)

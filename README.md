@@ -175,7 +175,7 @@ create table users (
 
 You'd need to define the type in Haskell first:
 
-```
+```hs
 module Example.Types
   ( Hobby (..),
   )

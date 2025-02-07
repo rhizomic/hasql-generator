@@ -8,6 +8,8 @@ import Data.Text (Text, unpack)
 import Hasql.Generator.Internal.Database.Sql.Analysis.Types
   ( ColumnMetadata (ColumnMetadata, columnNullConstraint, columnType),
     NullabilityConstraint (NotNull, Null),
+    ParameterMetadata (ParameterMetadata, parameterNullConstraint, parameterType),
+    ParameterType (ScalarParameter),
     PostgresqlParameterAndResultMetadata
       ( PostgresqlParameterAndResultMetadata,
         numberOfRowsReturned,
@@ -92,9 +94,9 @@ spec = do
           parameterAndResultMetadata =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata = []
@@ -110,9 +112,9 @@ spec = do
           parameterAndResultMetadata =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -133,9 +135,9 @@ spec = do
           parameterAndResultMetadata =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgText
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgText
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -164,13 +166,13 @@ spec = do
           parameterAndResultMetadata =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgText
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgText
+                      , parameterNullConstraint = NotNull
                       }
-                  , ColumnMetadata
-                      { columnType = PgText
-                      , columnNullConstraint = NotNull
+                  , ParameterMetadata
+                      { parameterType = ScalarParameter PgText
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata = []
@@ -186,13 +188,13 @@ spec = do
           parameterAndResultMetadata =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = NotNull
                       }
-                  , ColumnMetadata
-                      { columnType = PgText
-                      , columnNullConstraint = NotNull
+                  , ParameterMetadata
+                      { parameterType = ScalarParameter PgText
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -213,17 +215,17 @@ spec = do
           parameterAndResultMetadata =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgText
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgText
+                      , parameterNullConstraint = NotNull
                       }
-                  , ColumnMetadata
-                      { columnType = PgText
-                      , columnNullConstraint = NotNull
+                  , ParameterMetadata
+                      { parameterType = ScalarParameter PgText
+                      , parameterNullConstraint = NotNull
                       }
-                  , ColumnMetadata
-                      { columnType = PgText
-                      , columnNullConstraint = NotNull
+                  , ParameterMetadata
+                      { parameterType = ScalarParameter PgText
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -252,13 +254,13 @@ spec = do
           parameterAndResultMetadata =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgText
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgText
+                      , parameterNullConstraint = NotNull
                       }
-                  , ColumnMetadata
-                      { columnType = PgText
-                      , columnNullConstraint = NotNull
+                  , ParameterMetadata
+                      { parameterType = ScalarParameter PgText
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =

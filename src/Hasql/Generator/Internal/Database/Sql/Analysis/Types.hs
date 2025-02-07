@@ -5,6 +5,8 @@ module Hasql.Generator.Internal.Database.Sql.Analysis.Types
     ColumnTypeInformation (..),
     ColumnReferenceMetadata (..),
     ColumnMetadata (..),
+    ParameterType (..),
+    ParameterMetadata (..),
     PostgresqlParameterAndResultMetadata (..),
   )
 where
@@ -111,9 +113,20 @@ data ColumnMetadata = ColumnMetadata
   }
   deriving stock (Show, Eq)
 
+data ParameterType
+  = ScalarParameter PostgresqlType
+  | ArrayParameter PostgresqlType
+  deriving stock (Show, Eq)
+
+data ParameterMetadata = ParameterMetadata
+  { parameterType :: ParameterType
+  , parameterNullConstraint :: NullabilityConstraint
+  }
+  deriving stock (Show, Eq)
+
 -- | Metadata for the parameters and results involved in a given query.
 data PostgresqlParameterAndResultMetadata = PostgresqlParameterAndResultMetadata
-  { parameterMetadata :: [ColumnMetadata]
+  { parameterMetadata :: [ParameterMetadata]
   -- ^ The metadata for the query parameters.
   , resultMetadata :: [ColumnMetadata]
   -- ^ The metadata for the query results.

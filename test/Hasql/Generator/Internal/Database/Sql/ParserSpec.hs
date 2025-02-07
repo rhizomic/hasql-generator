@@ -5,7 +5,7 @@ module Hasql.Generator.Internal.Database.Sql.ParserSpec (spec) where
 
 import Data.Function (($))
 import Data.Functor ((<$>))
-import Data.List.NonEmpty (nonEmpty, sort)
+import Data.List.NonEmpty (nonEmpty, singleton, sort)
 import Data.Maybe (Maybe (Just, Nothing))
 import Data.Text (unpack)
 import Hasql.Generator.Internal.Database.Sql.Parser
@@ -18,7 +18,8 @@ import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( JoinInformation (JoinInformation, joinType, tableAndAlias),
     NumberOfRowsReturned (AtMostMoreThanOne, AtMostOne, ExactlyOne, None, Unknown),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin),
-    QueryParameter (QueryParameter, parameterNumber, parameterReference),
+    QueryParameter (QueryParameter, parameterAttributes, parameterNumber, parameterReference),
+    QueryParameterAttribute (ParameterIsArray),
     QueryResult (QueryResult),
     TableAndAlias (TableAndAlias, alias, table),
     TableRelation (BaseTable, JoinTable),
@@ -678,10 +679,12 @@ spec = do
                 [ QueryParameter
                     { parameterNumber = 1
                     , parameterReference = "id"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 2
                     , parameterReference = "created_at"
+                    , parameterAttributes = Nothing
                     }
                 ]
             actual = sort <$> parseQueryParameters result
@@ -697,10 +700,12 @@ spec = do
                 [ QueryParameter
                     { parameterNumber = 1
                     , parameterReference = "u.id"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 2
                     , parameterReference = "u.id"
+                    , parameterAttributes = Nothing
                     }
                 ]
             actual = sort <$> parseQueryParameters result
@@ -716,14 +721,17 @@ spec = do
                 [ QueryParameter
                     { parameterNumber = 1
                     , parameterReference = "a.city"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 2
                     , parameterReference = "u.id"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 3
                     , parameterReference = "a.line_2"
+                    , parameterAttributes = Nothing
                     }
                 ]
             actual = sort <$> parseQueryParameters result
@@ -740,10 +748,12 @@ spec = do
                 [ QueryParameter
                     { parameterNumber = 1
                     , parameterReference = "name"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 2
                     , parameterReference = "id"
+                    , parameterAttributes = Nothing
                     }
                 ]
             actual = sort <$> parseQueryParameters result
@@ -768,22 +778,27 @@ spec = do
                 [ QueryParameter
                     { parameterNumber = 1
                     , parameterReference = "u.name"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 2
                     , parameterReference = "n.short_version"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 3
                     , parameterReference = "n.long_version"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 4
                     , parameterReference = "n.long_version"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 5
                     , parameterReference = "a.city"
+                    , parameterAttributes = Nothing
                     }
                 ]
             actual = sort <$> parseQueryParameters result
@@ -808,10 +823,12 @@ spec = do
                 [ QueryParameter
                     { parameterNumber = 1
                     , parameterReference = "n.long_version"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 2
                     , parameterReference = "n.short_version"
+                    , parameterAttributes = Nothing
                     }
                 ]
             actual = sort <$> parseQueryParameters result
@@ -828,10 +845,43 @@ spec = do
                 [ QueryParameter
                     { parameterNumber = 1
                     , parameterReference = "email"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 2
                     , parameterReference = "name"
+                    , parameterAttributes = Nothing
+                    }
+                ]
+            actual = sort <$> parseQueryParameters result
+
+        actual `shouldBe` expected
+
+      it "Parses the parameters from a query that makes use of unnest" $ do
+        let query = "insert into users (use_2fa, email, phone, name) select * from unnest ($1, $2, $3, $4) returning id"
+        result <- assertRight <$> parseSql (unpack query)
+
+        let expected =
+              nonEmpty
+                [ QueryParameter
+                    { parameterNumber = 1
+                    , parameterReference = "use_2fa"
+                    , parameterAttributes = Just $ singleton ParameterIsArray
+                    }
+                , QueryParameter
+                    { parameterNumber = 2
+                    , parameterReference = "email"
+                    , parameterAttributes = Just $ singleton ParameterIsArray
+                    }
+                , QueryParameter
+                    { parameterNumber = 3
+                    , parameterReference = "phone"
+                    , parameterAttributes = Just $ singleton ParameterIsArray
+                    }
+                , QueryParameter
+                    { parameterNumber = 4
+                    , parameterReference = "name"
+                    , parameterAttributes = Just $ singleton ParameterIsArray
                     }
                 ]
             actual = sort <$> parseQueryParameters result
@@ -852,10 +902,12 @@ spec = do
                 [ QueryParameter
                     { parameterNumber = 1
                     , parameterReference = "n.short_version"
+                    , parameterAttributes = Nothing
                     }
                 , QueryParameter
                     { parameterNumber = 2
                     , parameterReference = "p.use_dark_mode"
+                    , parameterAttributes = Nothing
                     }
                 ]
             actual = sort <$> parseQueryParameters result

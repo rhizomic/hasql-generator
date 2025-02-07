@@ -8,13 +8,15 @@ import Hasql.Generator.Internal.Database.Sql
 import Hasql.Generator.Internal.Database.Sql.Analysis.Types
   ( ColumnMetadata (ColumnMetadata, columnNullConstraint, columnType),
     NullabilityConstraint (NotNull, Null),
+    ParameterMetadata (ParameterMetadata, parameterNullConstraint, parameterType),
+    ParameterType (ArrayParameter, ScalarParameter),
     PostgresqlParameterAndResultMetadata
       ( PostgresqlParameterAndResultMetadata,
         numberOfRowsReturned,
         parameterMetadata,
         resultMetadata
       ),
-    PostgresqlType (PgText, PgTimestamptz, PgUuid),
+    PostgresqlType (PgEnum, PgText, PgTimestamptz, PgUuid),
   )
 import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( NumberOfRowsReturned (Unknown),
@@ -38,9 +40,9 @@ spec pool =
       let expected =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -78,9 +80,9 @@ spec pool =
       let expected =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -106,9 +108,9 @@ spec pool =
       let expected =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -133,9 +135,9 @@ spec pool =
       let expected =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -169,13 +171,13 @@ spec pool =
       let expected =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = NotNull
                       }
-                  , ColumnMetadata
-                      { columnType = PgText
-                      , columnNullConstraint = NotNull
+                  , ParameterMetadata
+                      { parameterType = ScalarParameter PgText
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -208,9 +210,9 @@ spec pool =
       let expected =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -239,9 +241,9 @@ spec pool =
       let expected =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = Null
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = Null
                       }
                   ]
               , resultMetadata =
@@ -288,9 +290,9 @@ spec pool =
       let expected =
             PostgresqlParameterAndResultMetadata
               { parameterMetadata =
-                  [ ColumnMetadata
-                      { columnType = PgUuid
-                      , columnNullConstraint = NotNull
+                  [ ParameterMetadata
+                      { parameterType = ScalarParameter PgUuid
+                      , parameterNullConstraint = NotNull
                       }
                   ]
               , resultMetadata =
@@ -305,6 +307,45 @@ spec pool =
                   , ColumnMetadata
                       { columnType = PgText
                       , columnNullConstraint = Null
+                      }
+                  ]
+              , numberOfRowsReturned = Unknown
+              }
+
+      results `shouldBe` Right expected
+
+    it "returns the correct results for a query that makes use of insert ... select unnest" do
+      query <- readFile "test/sql/insert_select_unnest.sql"
+      results <- parameterAndResultMetadata pool query
+
+      let expected =
+            PostgresqlParameterAndResultMetadata
+              { parameterMetadata =
+                  [ ParameterMetadata
+                      { parameterType = ArrayParameter PgText
+                      , parameterNullConstraint = NotNull
+                      }
+                  , ParameterMetadata
+                      { parameterType = ArrayParameter PgText
+                      , parameterNullConstraint = NotNull
+                      }
+                  , ParameterMetadata
+                      { parameterType = ArrayParameter (PgEnum "hobby")
+                      , parameterNullConstraint = Null
+                      }
+                  , ParameterMetadata
+                      { parameterType = ArrayParameter PgTimestamptz
+                      , parameterNullConstraint = NotNull
+                      }
+                  , ParameterMetadata
+                      { parameterType = ArrayParameter PgTimestamptz
+                      , parameterNullConstraint = NotNull
+                      }
+                  ]
+              , resultMetadata =
+                  [ ColumnMetadata
+                      { columnType = PgUuid
+                      , columnNullConstraint = NotNull
                       }
                   ]
               , numberOfRowsReturned = Unknown

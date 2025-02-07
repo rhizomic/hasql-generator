@@ -3,6 +3,7 @@ module Hasql.Generator.Internal.Database.Sql.Parser.Types
     TableAndAlias (..),
     JoinInformation (..),
     TableRelation (..),
+    QueryParameterAttribute (..),
     QueryParameter (..),
     QueryResult (..),
     NumberOfRowsReturned (..),
@@ -11,6 +12,7 @@ where
 
 import Data.Eq (Eq)
 import Data.Int (Int)
+import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (Maybe)
 import Data.Ord (Ord (compare), Ordering)
 import Data.Text (Text)
@@ -42,9 +44,15 @@ data TableRelation
   | JoinTable JoinInformation
   deriving stock (Show, Eq)
 
+data QueryParameterAttribute
+  = -- | The query parameter represents an array of values.
+    ParameterIsArray
+  deriving stock (Show, Eq)
+
 data QueryParameter = QueryParameter
   { parameterNumber :: Int
   , parameterReference :: Text
+  , parameterAttributes :: Maybe (NonEmpty QueryParameterAttribute)
   }
   deriving stock (Show, Eq)
 

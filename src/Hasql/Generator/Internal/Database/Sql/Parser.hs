@@ -9,12 +9,13 @@ where
 import Control.Lens (toListOf, traverse, view)
 import Control.Monad ((=<<))
 import Data.Bool (Bool (False, True))
+import Data.Eq ((==))
 import Data.Foldable (concatMap, length)
 import Data.Function (($), (.))
 import Data.Functor (fmap, (<$>))
 import Data.Int (Int)
 import Data.List (null, sort, zip, (++))
-import Data.List.NonEmpty (NonEmpty, head, nonEmpty)
+import Data.List.NonEmpty (NonEmpty, head, nonEmpty, singleton)
 import Data.Maybe
   ( Maybe (Just, Nothing),
     catMaybes,
@@ -29,7 +30,8 @@ import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( JoinInformation (JoinInformation, joinType, tableAndAlias),
     NumberOfRowsReturned (AtMostMoreThanOne, AtMostOne, ExactlyOne, None, Unknown),
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin, RightJoin),
-    QueryParameter (QueryParameter, parameterNumber, parameterReference),
+    QueryParameter (QueryParameter, parameterAttributes, parameterNumber, parameterReference),
+    QueryParameterAttribute (ParameterIsArray),
     QueryResult (QueryResult),
     TableAndAlias (TableAndAlias, alias, table),
     TableRelation (BaseTable, JoinTable),
@@ -38,6 +40,7 @@ import PgQuery
   ( A_Expr,
     ColumnRef,
     DeleteStmt,
+    FuncCall,
     InsertStmt,
     JoinExpr,
     JoinType
@@ -74,6 +77,8 @@ import PgQuery
     cols,
     fields,
     fromClause,
+    funcname,
+    functions,
     indirection,
     items,
     ival,
@@ -85,6 +90,7 @@ import PgQuery
     maybe'alias,
     maybe'columnRef,
     maybe'deleteStmt,
+    maybe'funcCall,
     maybe'insertStmt,
     maybe'ival,
     maybe'joinExpr,
@@ -92,6 +98,7 @@ import PgQuery
     maybe'limitCount,
     maybe'node,
     maybe'paramRef,
+    maybe'rangeFunction,
     maybe'rexpr,
     maybe'selectStmt,
     maybe'string,
@@ -231,16 +238,19 @@ parseQueryParameters result =
         getParametersFromInsert insertStatement =
           let insertSelectWhereClause :: Node = view whereClause insertSelectStatement
 
-              insertSelectFromClauses :: [Node] = view fromClause insertSelectStatement
               joinClauses =
                 fmap
                   (view (joinExpr . quals))
                   insertSelectFromClauses
            in queryParametersFromInsertValues
+                ++ queryParametersFromInsertUnnest
                 ++ concatMap nodeToParameters (insertSelectWhereClause : joinClauses)
           where
             insertSelectStatement :: SelectStmt
             insertSelectStatement = view (selectStmt . selectStmt) insertStatement
+
+            insertSelectFromClauses :: [Node]
+            insertSelectFromClauses = view fromClause insertSelectStatement
 
             queryParametersFromInsertValues :: [QueryParameter]
             queryParametersFromInsertValues =
@@ -260,11 +270,56 @@ parseQueryParameters result =
                   case view maybe'paramRef node of
                     Nothing -> Nothing
                     Just paramRef ->
+                      Just
+                        QueryParameter
+                          { parameterNumber = fromIntegral (view number paramRef)
+                          , parameterReference = parameterReference
+                          , parameterAttributes = Nothing
+                          }
+
+            -- TODO: Check that the query makes use of "_select *_ from unnest"
+            queryParametersFromInsertUnnest :: [QueryParameter]
+            queryParametersFromInsertUnnest =
+              case mFuncCall of
+                Nothing -> []
+                Just fnCall ->
+                  let funcNames = view funcname fnCall
+                      fnName = maybe "" (nodeToText . head) (nonEmpty funcNames)
+                   in case fnName == "unnest" of
+                        False -> []
+                        True ->
+                          let insertColumns = view cols insertStatement
+                              insertColumnNames = fmap (view (resTarget . name)) insertColumns
+
+                              insertUnnestArgs = view args fnCall
+
+                              columnNamesAndValues = zip insertColumnNames insertUnnestArgs
+                           in mapMaybe toParameter columnNamesAndValues
+              where
+                mFuncCall :: Maybe FuncCall
+                mFuncCall = do
+                  clause <- head <$> nonEmpty insertSelectFromClauses
+
+                  let fns = maybe [] (view functions) (view maybe'rangeFunction clause)
+                  fn <- head <$> nonEmpty fns
+
+                  let lstItems = view (list . items) fn
+                  item <- head <$> nonEmpty lstItems
+
+                  view maybe'funcCall item
+
+                toParameter :: (Text, Node) -> Maybe QueryParameter
+                toParameter (parameterReference, node) =
+                  case view maybe'paramRef node of
+                    Nothing -> Nothing
+                    Just paramRef ->
                       let parameterNumber = fromIntegral (view number paramRef)
+                          parameterAttributes = Just $ singleton ParameterIsArray
                        in Just
                             QueryParameter
                               { parameterNumber
                               , parameterReference
+                              , parameterAttributes
                               }
 
     nodeToParameters :: Node -> [QueryParameter]
@@ -302,12 +357,11 @@ parseQueryParameters result =
           ParamRef ->
           QueryParameter
         toParameter columnRef paramRef =
-          let parameterNumber = fromIntegral (view number paramRef)
-              allFields = view fields columnRef
-              parameterReference = intercalate "." (fmap nodeToText allFields)
+          let allFields = view fields columnRef
            in QueryParameter
-                { parameterNumber
-                , parameterReference
+                { parameterNumber = fromIntegral (view number paramRef)
+                , parameterReference = intercalate "." (fmap nodeToText allFields)
+                , parameterAttributes = Nothing
                 }
 
     listToParamRefs ::
@@ -327,6 +381,7 @@ parseQueryParameters result =
            in [ QueryParameter
                   { parameterNumber = fromIntegral (view number paramRef)
                   , parameterReference = view name target <> suffix
+                  , parameterAttributes = Nothing
                   }
               ]
         Nothing ->

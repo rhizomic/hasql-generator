@@ -4,7 +4,7 @@ module Hasql.Generator.Internal.Database.Sql.Analysis
 where
 
 import Control.Applicative (pure, (<*>))
-import Data.Bool (Bool)
+import Data.Bool (Bool (False, True))
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Foldable (elem, foldl')
@@ -32,6 +32,12 @@ import Hasql.Generator.Internal.Database.Sql.Analysis.Types
         columnUnderlyingType
       ),
     NullabilityConstraint (NotNull, Null),
+    ParameterMetadata
+      ( ParameterMetadata,
+        parameterNullConstraint,
+        parameterType
+      ),
+    ParameterType (ArrayParameter, ScalarParameter),
     PostgresqlParameterAndResultMetadata
       ( PostgresqlParameterAndResultMetadata,
         numberOfRowsReturned,
@@ -71,7 +77,8 @@ import Hasql.Generator.Internal.Database.Sql.Parser.Types
   ( JoinInformation (joinType, tableAndAlias),
     NumberOfRowsReturned,
     PostgresqlJoinType (FullJoin, InnerJoin, LeftJoin, RightJoin),
-    QueryParameter (parameterReference),
+    QueryParameter (parameterAttributes, parameterReference),
+    QueryParameterAttribute (ParameterIsArray),
     QueryResult (QueryResult),
     TableAndAlias (alias, table),
     TableRelation (BaseTable, JoinTable),
@@ -88,27 +95,44 @@ getParameterAndResultMetadata ::
 getParameterAndResultMetadata mTableRelations mParameters mResults numberOfRowsReturned = do
   columnReferenceMetadata <- maybe (pure []) getColumnReferenceMetadata mTableRelations
 
-  let toColumnMetadata = referenceToColumnMetadata columnReferenceMetadata
-      parameters = maybe [] (fmap (.parameterReference) . toList) mParameters
+  let parameters = maybe [] toList mParameters
       results = maybe [] (fmap coerce . toList) mResults
 
   pure
     PostgresqlParameterAndResultMetadata
-      { parameterMetadata = fmap toColumnMetadata parameters
-      , resultMetadata = fmap toColumnMetadata results
+      { parameterMetadata = fmap (queryParameterToParameterMetadata columnReferenceMetadata) parameters
+      , resultMetadata = fmap (referenceToColumnMetadata columnReferenceMetadata) results
       , numberOfRowsReturned = numberOfRowsReturned
       }
   where
+    queryParameterToParameterMetadata ::
+      [ColumnReferenceMetadata] ->
+      QueryParameter ->
+      ParameterMetadata
+    queryParameterToParameterMetadata columnReferenceMetadata queryParameter =
+      let reference = queryParameter.parameterReference
+          referenceMetadata = referenceMetadataFromReference columnReferenceMetadata reference
+       in toParameterMetadata referenceMetadata
+      where
+        toParameterMetadata ::
+          ColumnReferenceMetadata ->
+          ParameterMetadata
+        toParameterMetadata referenceMetadata =
+          let attributes = maybe [] toList queryParameter.parameterAttributes
+              parameterType = case ParameterIsArray `elem` attributes of
+                True -> ArrayParameter referenceMetadata.columnType
+                False -> ScalarParameter referenceMetadata.columnType
+           in ParameterMetadata
+                { parameterType = parameterType
+                , parameterNullConstraint = referenceMetadata.columnNullConstraint
+                }
+
     referenceToColumnMetadata ::
       [ColumnReferenceMetadata] ->
       Text ->
       ColumnMetadata
     referenceToColumnMetadata columnReferenceMetadata reference =
-      let referenceMetadata =
-            case filter (elem reference . (.columnReferences)) columnReferenceMetadata of
-              [] -> error $ "Reference `" <> unpack reference <> "` doesn't point to any known column."
-              [x] -> x
-              (_x : _xs) -> error $ "Reference `" <> unpack reference <> "` could not be resolved to a single column."
+      let referenceMetadata = referenceMetadataFromReference columnReferenceMetadata reference
        in toColumnMetadata referenceMetadata
       where
         toColumnMetadata ::
@@ -119,6 +143,16 @@ getParameterAndResultMetadata mTableRelations mParameters mResults numberOfRowsR
             { columnType = referenceMetadata.columnType
             , columnNullConstraint = referenceMetadata.columnNullConstraint
             }
+
+    referenceMetadataFromReference ::
+      [ColumnReferenceMetadata] ->
+      Text ->
+      ColumnReferenceMetadata
+    referenceMetadataFromReference columnReferenceMetadata reference =
+      case filter (elem reference . (.columnReferences)) columnReferenceMetadata of
+        [] -> error $ "Reference `" <> unpack reference <> "` doesn't point to any known column."
+        [x] -> x
+        (_x : _xs) -> error $ "Reference `" <> unpack reference <> "` could not be resolved to a single column."
 
 -- | Retrieves all of the 'ColumnReferenceMetadata' for each of the
 --   'TableRelation's.

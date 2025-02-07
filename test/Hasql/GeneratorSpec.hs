@@ -50,6 +50,9 @@ spec = do
     it "generates the code for user_info_by_uuid.sql" $ do
       testGeneratedCode "test/sql/user_info_by_uuid.sql"
 
+    it "generates the code for insert_select_unnest.sql" $ do
+      testGeneratedCode "test/sql/insert_select_unnest.sql"
+
 testGeneratedCode :: FilePath -> IO (Golden String)
 testGeneratedCode inputFile = do
   migrationFiles <- getMigrationFiles

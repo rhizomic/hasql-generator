@@ -1,0 +1,57 @@
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
+module Query
+  (query)
+where
+
+import Contravariant.Extras (contrazip5)
+import Control.Applicative ((<*>))
+import Data.Bool (Bool (True))
+import Data.ByteString (ByteString)
+import Data.Either (Either (Right))
+import Data.Function (($))
+import Data.Functor ((<$>))
+import Data.Maybe (Maybe)
+import Data.Text (Text)
+import Data.Time.Clock (UTCTime)
+import Data.UUID (UUID)
+import Data.Vector (Vector)
+import Hasql.Decoders qualified as Decoders
+import Hasql.Encoders qualified as Encoders
+import Hasql.Generator.Types (HasqlEnum (hsToPg, pgToHs))
+import Hasql.Statement (Statement (Statement))
+import Hasql.Transaction (Transaction, statement)
+import TestImport.Types (Hobby)
+
+query ::
+  Vector Text ->
+  Vector Text ->
+  Vector (Maybe Hobby) ->
+  Vector UTCTime ->
+  Vector UTCTime ->
+  Transaction (Vector UUID)
+query a1 a2 a3 a4 a5 =
+  statement
+   params
+   (Statement sql encoder decoder True)
+
+  where
+    sql :: ByteString
+    sql = "insert into users\n  ( email\n  , name\n  , favorite_hobby\n  , created_at\n  , updated_at\n  )\n\nselect * from\n  unnest\n    ( $1\n    , $2\n    , $3\n    , $4\n    , $5\n    )\n\nreturning id;\n"
+
+    params :: (Vector Text, Vector Text, Vector (Maybe Hobby), Vector UTCTime, Vector UTCTime)
+    params = (a1, a2, a3, a4, a5)
+
+    encoder :: Encoders.Params (Vector Text, Vector Text, Vector (Maybe Hobby), Vector UTCTime, Vector UTCTime)
+    encoder =
+      contrazip5
+        (Encoders.param $ Encoders.nonNullable $ Encoders.foldableArray $ Encoders.nonNullable Encoders.text)
+        (Encoders.param $ Encoders.nonNullable $ Encoders.foldableArray $ Encoders.nonNullable Encoders.text)
+        (Encoders.param $ Encoders.nonNullable $ Encoders.foldableArray $ Encoders.nullable (Encoders.enum hsToPg))
+        (Encoders.param $ Encoders.nonNullable $ Encoders.foldableArray $ Encoders.nonNullable Encoders.timestamptz)
+        (Encoders.param $ Encoders.nonNullable $ Encoders.foldableArray $ Encoders.nonNullable Encoders.timestamptz)
+
+    decoder :: Decoders.Result (Vector UUID)
+    decoder =
+      Decoders.rowVector $
+        Decoders.column (Decoders.nonNullable Decoders.uuid)
